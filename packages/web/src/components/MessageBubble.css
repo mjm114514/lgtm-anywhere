@@ -1,79 +1,259 @@
-.message-bubble {
+/* ── User bubble ── */
+.message-bubble--user {
+  align-self: flex-end;
   max-width: 75%;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: #1976d2;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.5;
   word-wrap: break-word;
   white-space: pre-wrap;
 }
 
-.message-bubble--user {
-  align-self: flex-end;
-  background: #1976d2;
-  color: #fff;
-}
-
+/* ── Assistant (timeline) ── */
 .message-bubble--assistant {
   align-self: flex-start;
-  background: #fff;
-  color: #1a1a1a;
-  border: 1px solid #e0e0e0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.message-bubble-role {
-  font-size: 11px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  opacity: 0.7;
+/* ── Timeline item ── */
+.timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0;
 }
 
-.message-bubble--user .message-bubble-role {
-  color: rgba(255, 255, 255, 0.8);
+.timeline-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: #1a1a1a;
 }
 
-.message-bubble-streaming {
-  font-weight: 400;
-  font-style: italic;
+.timeline-dot--tool {
+  background: #4caf50;
 }
 
-.message-bubble-content {
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Text content (markdown) ── */
+.timeline-text {
   font-size: 14px;
+  line-height: 1.6;
+  color: #1a1a1a;
+}
+
+.timeline-text p {
+  margin: 0 0 8px 0;
+}
+
+.timeline-text p:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-text code {
+  background: #e8e8e8;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+}
+
+.timeline-text pre {
+  margin: 8px 0;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 13px;
   line-height: 1.5;
 }
 
-.message-bubble-empty {
-  opacity: 0.5;
-  font-style: italic;
+.timeline-text pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
 }
 
-.message-bubble-tool {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  font-size: 12px;
+.timeline-text h1,
+.timeline-text h2,
+.timeline-text h3,
+.timeline-text h4 {
+  margin: 12px 0 6px 0;
+  font-weight: 600;
+}
+
+.timeline-text h1 { font-size: 18px; }
+.timeline-text h2 { font-size: 16px; }
+.timeline-text h3 { font-size: 15px; }
+.timeline-text h4 { font-size: 14px; }
+
+.timeline-text ul,
+.timeline-text ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.timeline-text li {
+  margin: 2px 0;
+}
+
+.timeline-text blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid #ddd;
   color: #666;
 }
 
-.message-bubble--user .message-bubble-tool {
-  border-top-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
+.timeline-text a {
+  color: #1976d2;
+  text-decoration: none;
 }
 
-.message-bubble-tool-result {
-  margin-top: 6px;
-  font-size: 12px;
+.timeline-text a:hover {
+  text-decoration: underline;
 }
 
-.message-bubble-tool-result summary {
-  cursor: pointer;
-  color: #666;
+.timeline-text table {
+  border-collapse: collapse;
+  margin: 8px 0;
 }
 
-.message-bubble-tool-result pre {
-  margin-top: 4px;
-  padding: 8px;
+.timeline-text th,
+.timeline-text td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.timeline-text th {
   background: #f5f5f5;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Streaming indicators ── */
+.timeline-streaming {
+  color: #888;
+  font-style: italic;
+  font-size: 14px;
+}
+
+.timeline-streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  background: #1a1a1a;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ── Tool block ── */
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
   line-height: 1.4;
+  user-select: none;
+}
+
+.tool-header:hover {
+  opacity: 0.8;
+}
+
+.tool-name {
+  font-weight: 700;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  color: #1a1a1a;
+}
+
+.tool-input-summary {
+  color: #666;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
+}
+
+.tool-chevron {
+  color: #999;
+  font-size: 11px;
+  transition: transform 0.15s ease;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tool-chevron--open {
+  transform: rotate(90deg);
+}
+
+.tool-detail {
+  margin-top: 4px;
+}
+
+.tool-input pre {
+  margin: 0;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-x: auto;
+  color: #444;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+}
+
+/* ── Tool result ── */
+.tool-result {
+  margin-top: 4px;
+}
+
+.tool-result pre {
+  margin: 0;
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-x: auto;
+  color: #666;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+}
+
+.tool-result-toggle {
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #1976d2;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tool-result-toggle:hover {
+  text-decoration: underline;
 }

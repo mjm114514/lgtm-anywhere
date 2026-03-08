@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { WSServerMessage } from "@lgtm-anywhere/shared";
 
+// A single content block in an assistant turn
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; toolUseId: string; name: string; input?: unknown }
+  | { type: "tool_result"; toolUseId: string; content: string };
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
-  content: string;
-  toolUse?: { name: string; id: string };
-  toolResult?: { toolUseId: string; content: string };
+  content: string; // plain text (for user messages or backward compat)
+  blocks: ContentBlock[]; // structured content blocks for assistant messages
   isStreaming?: boolean;
 }
 
@@ -52,8 +57,11 @@ export function useSessionSocket(
 
       switch (msg.event) {
         case "assistant": {
-          const text = extractText(msg.data.message);
-          const toolUse = extractToolUse(msg.data.message);
+          const blocks = extractBlocks(msg.data.message);
+          const text = blocks
+            .filter((b): b is ContentBlock & { type: "text" } => b.type === "text")
+            .map((b) => b.text)
+            .join("");
           // Finalized assistant message — replace any streaming placeholder
           setMessages((prev) => {
             const filtered = prev.filter(
@@ -65,7 +73,7 @@ export function useSessionSocket(
                 id: msg.data.uuid,
                 role: "assistant",
                 content: text,
-                toolUse: toolUse ?? undefined,
+                blocks,
               },
             ];
           });
@@ -91,6 +99,7 @@ export function useSessionSocket(
                   id: buf.id,
                   role: "assistant",
                   content: buf.text,
+                  blocks: [{ type: "text", text: buf.text }],
                   isStreaming: true,
                 };
                 if (existing >= 0) {
@@ -106,18 +115,40 @@ export function useSessionSocket(
         }
 
         case "tool_result": {
-          const text = extractText(msg.data.message);
-          if (text) {
-            const toolResult = extractToolResult(msg.data.message);
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: msg.data.uuid ?? `tr-${Date.now()}`,
-                role: "user",
-                content: text,
-                toolResult: toolResult ?? undefined,
-              },
-            ]);
+          const toolResult = extractToolResultBlock(msg.data.message);
+          if (toolResult) {
+            // Attach tool_result to the last assistant message's matching tool_use
+            setMessages((prev) => {
+              const next = [...prev];
+              // Walk backwards to find the assistant message containing this tool_use
+              for (let i = next.length - 1; i >= 0; i--) {
+                const m = next[i];
+                if (m.role === "assistant") {
+                  const hasToolUse = m.blocks.some(
+                    (b) =>
+                      b.type === "tool_use" &&
+                      b.toolUseId === toolResult.toolUseId
+                  );
+                  if (hasToolUse) {
+                    next[i] = {
+                      ...m,
+                      blocks: [...m.blocks, toolResult],
+                    };
+                    return next;
+                  }
+                }
+              }
+              // Fallback: couldn't match — append as standalone
+              return [
+                ...prev,
+                {
+                  id: msg.data.uuid ?? `tr-${Date.now()}`,
+                  role: "assistant",
+                  content: "",
+                  blocks: [toolResult],
+                },
+              ];
+            });
           }
           break;
         }
@@ -157,7 +188,12 @@ export function useSessionSocket(
       // Add user message to local state immediately
       setMessages((prev) => [
         ...prev,
-        { id: `user-${Date.now()}`, role: "user", content: text },
+        {
+          id: `user-${Date.now()}`,
+          role: "user",
+          content: text,
+          blocks: [{ type: "text", text }],
+        },
       ]);
       wsRef.current.send(JSON.stringify({ type: "message", message: text }));
       setIsStreaming(true);
@@ -168,42 +204,62 @@ export function useSessionSocket(
   return { messages, isStreaming, error, sendMessage, setMessages };
 }
 
-function extractText(message: unknown): string {
-  if (!message || typeof message !== "object") return "";
+/** Extract all content blocks from an Anthropic message. */
+function extractBlocks(message: unknown): ContentBlock[] {
+  if (!message || typeof message !== "object") return [];
   const msg = message as Record<string, unknown>;
-  if (typeof msg.content === "string") return msg.content;
-  if (Array.isArray(msg.content)) {
-    return (msg.content as Array<Record<string, unknown>>)
-      .filter((b) => b.type === "text" && typeof b.text === "string")
-      .map((b) => b.text as string)
-      .join("");
+
+  // Simple string content
+  if (typeof msg.content === "string") {
+    return msg.content ? [{ type: "text", text: msg.content }] : [];
   }
-  return "";
+
+  if (!Array.isArray(msg.content)) return [];
+
+  const blocks: ContentBlock[] = [];
+  for (const b of msg.content as Array<Record<string, unknown>>) {
+    if (b.type === "text" && typeof b.text === "string") {
+      blocks.push({ type: "text", text: b.text });
+    } else if (b.type === "tool_use") {
+      blocks.push({
+        type: "tool_use",
+        toolUseId: b.id as string,
+        name: b.name as string,
+        input: b.input,
+      });
+    } else if (b.type === "tool_result") {
+      const content =
+        typeof b.content === "string"
+          ? b.content
+          : Array.isArray(b.content)
+            ? (b.content as Array<Record<string, unknown>>)
+                .filter((c) => c.type === "text")
+                .map((c) => c.text)
+                .join("")
+            : "";
+      blocks.push({
+        type: "tool_result",
+        toolUseId: b.tool_use_id as string,
+        content,
+      });
+    }
+  }
+  return blocks;
 }
 
-function extractToolUse(
+/** Extract a single tool_result block from a tool_result WS message. */
+function extractToolResultBlock(
   message: unknown
-): { name: string; id: string } | null {
+): ContentBlock & { type: "tool_result" } | null {
   if (!message || typeof message !== "object") return null;
   const msg = message as Record<string, unknown>;
   if (!Array.isArray(msg.content)) return null;
-  const block = (msg.content as Array<Record<string, unknown>>).find(
-    (b) => b.type === "tool_use"
-  );
-  if (!block) return null;
-  return { name: block.name as string, id: block.id as string };
-}
 
-function extractToolResult(
-  message: unknown
-): { toolUseId: string; content: string } | null {
-  if (!message || typeof message !== "object") return null;
-  const msg = message as Record<string, unknown>;
-  if (!Array.isArray(msg.content)) return null;
   const block = (msg.content as Array<Record<string, unknown>>).find(
     (b) => b.type === "tool_result"
   );
   if (!block) return null;
+
   const content =
     typeof block.content === "string"
       ? block.content
@@ -213,5 +269,5 @@ function extractToolResult(
             .map((b) => b.text)
             .join("")
         : "";
-  return { toolUseId: block.tool_use_id as string, content };
+  return { type: "tool_result", toolUseId: block.tool_use_id as string, content };
 }

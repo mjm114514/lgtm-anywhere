@@ -1,10 +1,9 @@
-import { useEffect, useCallback } from "react";
-import { fetchSessionDetail } from "../api";
+import { useState, useEffect, useCallback } from "react";
+import { fetchSessionDetail, createSession } from "../api";
 import { useSessionSocket } from "../hooks/useSessionSocket";
-import { extractTextContent, extractToolUse } from "../utils/format";
+import { extractTextContent, extractContentBlocks } from "../utils/format";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
-import { NewSessionForm } from "./NewSessionForm";
 import type { SelectedProject } from "../App";
 import type { ChatMessage } from "../hooks/useSessionSocket";
 import "./ChatArea.css";
@@ -24,24 +23,66 @@ export function ChatArea({
 }: ChatAreaProps) {
   const { messages, isStreaming, error, sendMessage, setMessages } =
     useSessionSocket(selectedSessionId);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const loadHistory = useCallback(
     async (sessionId: string) => {
       try {
         const detail = await fetchSessionDetail(sessionId);
-        const historical: ChatMessage[] = detail.messages.map((m) => {
+
+        // First pass: build all messages with blocks
+        const allMessages: ChatMessage[] = detail.messages.map((m) => {
           const text = extractTextContent(m.message);
-          const tools = extractToolUse(m.message);
+          const blocks = extractContentBlocks(m.message);
           return {
             id: m.uuid,
             role: m.type as "user" | "assistant",
             content: text,
-            toolUse: tools.length > 0 ? tools[0] : undefined,
+            blocks: blocks.map((b) => {
+              if (b.type === "text") return { type: "text" as const, text: b.text! };
+              if (b.type === "tool_use")
+                return {
+                  type: "tool_use" as const,
+                  toolUseId: b.toolUseId!,
+                  name: b.name!,
+                  input: b.input,
+                };
+              return {
+                type: "tool_result" as const,
+                toolUseId: b.toolUseId!,
+                content: b.content ?? "",
+              };
+            }),
           };
         });
-        setMessages(historical);
+
+        // Second pass: merge tool_result messages into the corresponding assistant message
+        const merged: ChatMessage[] = [];
+        for (const m of allMessages) {
+          if (m.role === "user" && m.blocks.some((b) => b.type === "tool_result")) {
+            const toolResults = m.blocks.filter((b) => b.type === "tool_result");
+            let matched = false;
+            for (let i = merged.length - 1; i >= 0; i--) {
+              if (merged[i].role === "assistant") {
+                merged[i] = {
+                  ...merged[i],
+                  blocks: [...merged[i].blocks, ...toolResults],
+                };
+                matched = true;
+                break;
+              }
+            }
+            if (!matched) {
+              merged.push(m);
+            }
+          } else {
+            merged.push(m);
+          }
+        }
+
+        setMessages(merged);
       } catch {
-        // Session detail may fail for inactive sessions; start with empty
         setMessages([]);
       }
     },
@@ -56,12 +97,46 @@ export function ChatArea({
     }
   }, [selectedSessionId, loadHistory, setMessages]);
 
+  // Reset create state when switching away from new session
+  useEffect(() => {
+    if (!showNewSession) {
+      setCreating(false);
+      setCreateError(null);
+    }
+  }, [showNewSession]);
+
+  const handleNewSessionSend = async (text: string, model?: string) => {
+    if (!selectedProject || creating) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await createSession(selectedProject.cwd, {
+        message: text,
+        model: model || undefined,
+      });
+      onSessionCreated(res.sessionId);
+    } catch (err) {
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to create session"
+      );
+      setCreating(false);
+    }
+  };
+
+  // New session: same layout as active chat, but empty messages + model selector
   if (showNewSession && selectedProject) {
     return (
       <div className="chat-area">
-        <NewSessionForm
-          cwd={selectedProject.cwd}
-          onCreated={onSessionCreated}
+        {createError && <div className="chat-area-error">{createError}</div>}
+        <MessageList messages={[]} isStreaming={false} />
+        <ChatInput
+          onSend={handleNewSessionSend}
+          disabled={creating}
+          placeholder={
+            creating
+              ? "Creating session..."
+              : "What would you like Claude to help with?"
+          }
         />
       </div>
     );
