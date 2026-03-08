@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchSessionDetail, createSession } from "../api";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { extractTextContent, extractContentBlocks } from "../utils/format";
@@ -25,6 +25,8 @@ export function ChatArea({
     useSessionSocket(selectedSessionId);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  // Track sessions we just created — skip loadHistory since WS delivers events in real time
+  const justCreatedRef = useRef<Set<string>>(new Set());
 
   const loadHistory = useCallback(
     async (sessionId: string) => {
@@ -91,6 +93,11 @@ export function ChatArea({
 
   useEffect(() => {
     if (selectedSessionId) {
+      if (justCreatedRef.current.has(selectedSessionId)) {
+        // Newly created session — messages already seeded, WS will deliver the rest
+        justCreatedRef.current.delete(selectedSessionId);
+        return;
+      }
       loadHistory(selectedSessionId);
     } else {
       setMessages([]);
@@ -114,6 +121,16 @@ export function ChatArea({
         message: text,
         model: model || undefined,
       });
+      // Seed the user message so it appears immediately when the session view loads
+      setMessages([
+        {
+          id: `user-${Date.now()}`,
+          role: "user",
+          content: text,
+          blocks: [{ type: "text", text }],
+        },
+      ]);
+      justCreatedRef.current.add(res.sessionId);
       onSessionCreated(res.sessionId);
     } catch (err) {
       setCreateError(

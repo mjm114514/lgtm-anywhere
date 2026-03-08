@@ -64,9 +64,7 @@ export function useSessionSocket(
             .join("");
           // Finalized assistant message — replace any streaming placeholder
           setMessages((prev) => {
-            const filtered = prev.filter(
-              (m) => !(m.id === msg.data.uuid && m.isStreaming)
-            );
+            const filtered = prev.filter((m) => !m.isStreaming);
             return [
               ...filtered,
               {

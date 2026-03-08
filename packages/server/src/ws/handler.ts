@@ -2,6 +2,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
 import type { Server } from "node:http";
 import type { WSClientMessage } from "@lgtm-anywhere/shared";
+import { listSessions } from "@anthropic-ai/claude-agent-sdk";
 import { SessionManager } from "../services/session-manager.js";
 
 const WS_PATH_RE = /^\/ws\/sessions\/([^/]+)$/;
@@ -61,14 +62,22 @@ function handleConnection(
       }
 
       try {
-        // Get cwd from the active session (must exist since WS is subscribed)
+        let cwd: string;
         const activeSession = sessionManager.getActiveSession(sessionId);
-        if (!activeSession) {
-          sendError(ws, "Session is not active, send a message via REST to reactivate", "SESSION_INACTIVE");
-          return;
+        if (activeSession) {
+          cwd = activeSession.cwd;
+        } else {
+          // Session is inactive (recycled) — look up cwd from SDK to reactivate
+          const allSessions = await listSessions({});
+          const info = allSessions.find((s) => s.sessionId === sessionId);
+          if (!info?.cwd) {
+            sendError(ws, "Session not found", "SESSION_NOT_FOUND");
+            return;
+          }
+          cwd = info.cwd;
         }
 
-        const session = await sessionManager.sendMessage(sessionId, msg.message, activeSession.cwd);
+        const session = await sessionManager.sendMessage(sessionId, msg.message, cwd);
         // Ensure this WS is subscribed (may be a new session after reactivation)
         session.wsClients.add(ws);
       } catch (err) {
