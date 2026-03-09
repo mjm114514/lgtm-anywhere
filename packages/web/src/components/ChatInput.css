@@ -5,6 +5,7 @@
   padding: 12px 16px;
   border-top: 1px solid #e0e0e0;
   background: #fff;
+  container-type: inline-size;
 }
 
 .chat-input-model {
@@ -43,6 +44,7 @@
 
 .chat-input-textarea {
   flex: 1;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid #d0d0d0;
   border-radius: 8px;
@@ -58,6 +60,13 @@
   /* Overlay scrollbar — thin, doesn't affect layout */
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+}
+
+/* Hide placeholder when container is narrow */
+@container (max-width: 400px) {
+  .chat-input-textarea::placeholder {
+    color: transparent;
+  }
 }
 
 /* WebKit overlay scrollbar */
@@ -89,14 +98,28 @@
 }
 
 .chat-input-send {
-  padding: 10px 20px;
+  /* Match textarea single-line height: 14px * 1.5 = 21px + 20px padding + 2px border = 43px */
+  box-sizing: border-box;
+  height: 43px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
   background: #1976d2;
   color: #fff;
   border: none;
   border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.chat-input-send-shortcut {
   font-size: 14px;
   font-weight: 500;
-  transition: background 0.15s;
+  line-height: 1;
+  font-family: inherit;
 }
 
 .chat-input-send:hover:not(:disabled) {
