@@ -41,6 +41,9 @@ export function useSessionSocket(
   const streamBufRef = useRef<{ id: string; text: string } | null>(null);
 
   useEffect(() => {
+    // Reset pending question whenever session changes
+    setPendingQuestion(null);
+
     if (!sessionId) {
       wsRef.current?.close();
       wsRef.current = null;

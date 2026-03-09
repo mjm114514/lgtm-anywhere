@@ -396,6 +396,7 @@ export class SessionManager extends EventEmitter {
             session.sessionId = message.session_id;
             this.activeSessions.set(session.sessionId, session);
             this.emit("session_state", { sessionId: session.sessionId, state: "active" as SessionState });
+            this.emit("session_created", { sessionId: session.sessionId, cwd: session.cwd });
           }
           session.resolveSessionId(message.session_id);
         }

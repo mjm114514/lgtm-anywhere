@@ -29,7 +29,7 @@ export function SessionList({
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { getState } = useSessionSync();
+  const { getState, onSessionCreated } = useSessionSync();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -47,6 +47,15 @@ export function SessionList({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Refetch session list when a new session is created for this cwd
+  useEffect(() => {
+    return onSessionCreated((_sessionId, sessionCwd) => {
+      if (sessionCwd === cwd) {
+        load();
+      }
+    });
+  }, [cwd, load, onSessionCreated]);
 
   return (
     <div className="session-list">

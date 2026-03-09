@@ -4,6 +4,7 @@ import type { SessionState, WSSyncMessage } from "@lgtm-anywhere/shared";
 interface UseSessionSyncReturn {
   stateMap: Map<string, SessionState>;
   getState: (sessionId: string) => SessionState | undefined;
+  onSessionCreated: (callback: (sessionId: string, cwd: string) => void) => () => void;
 }
 
 export function useSessionSync(): UseSessionSyncReturn {
@@ -13,6 +14,7 @@ export function useSessionSync(): UseSessionSyncReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const sessionCreatedListeners = useRef<Set<(sessionId: string, cwd: string) => void>>(new Set());
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -37,6 +39,10 @@ export function useSessionSync(): UseSessionSyncReturn {
           next.set(msg.data.sessionId, msg.data.state);
           return next;
         });
+      } else if (msg.event === "session_created") {
+        for (const listener of sessionCreatedListeners.current) {
+          listener(msg.data.sessionId, msg.data.cwd);
+        }
       }
     };
 
@@ -68,5 +74,15 @@ export function useSessionSync(): UseSessionSyncReturn {
     [stateMap]
   );
 
-  return { stateMap, getState };
+  const onSessionCreated = useCallback(
+    (callback: (sessionId: string, cwd: string) => void) => {
+      sessionCreatedListeners.current.add(callback);
+      return () => {
+        sessionCreatedListeners.current.delete(callback);
+      };
+    },
+    []
+  );
+
+  return { stateMap, getState, onSessionCreated };
 }
