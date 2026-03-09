@@ -23,6 +23,7 @@ export interface PendingQuestion {
 interface UseSessionSocketReturn {
   messages: ChatMessage[];
   isStreaming: boolean;
+  isLoadingHistory: boolean;
   error: string | null;
   pendingQuestion: PendingQuestion | null;
   sendMessage: (text: string) => void;
@@ -35,10 +36,12 @@ export function useSessionSocket(
 ): UseSessionSocketReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<PendingQuestion | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const streamBufRef = useRef<{ id: string; text: string } | null>(null);
+  const isLoadingHistoryRef = useRef(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -47,6 +50,9 @@ export function useSessionSocket(
       return;
     }
 
+    // Clear stale state from previous session
+    setMessages([]);
+    setIsStreaming(false);
     setError(null);
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -181,18 +187,33 @@ export function useSessionSocket(
           break;
         }
 
-        case "pending_message": {
+        case "session_message": {
           const text = msg.data.message;
           setMessages((prev) => [
             ...prev,
             {
-              id: `user-${Date.now()}`,
+              id: `user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
               role: "user",
               content: text,
               blocks: [{ type: "text", text }],
             },
           ]);
-          setIsStreaming(true);
+          if (!isLoadingHistoryRef.current) {
+            setIsStreaming(true);
+          }
+          break;
+        }
+
+        case "history_batch_start": {
+          isLoadingHistoryRef.current = true;
+          setIsLoadingHistory(true);
+          setMessages([]);
+          break;
+        }
+
+        case "history_batch_end": {
+          isLoadingHistoryRef.current = false;
+          setIsLoadingHistory(false);
           break;
         }
       }
@@ -232,7 +253,7 @@ export function useSessionSocket(
     []
   );
 
-  return { messages, isStreaming, error, pendingQuestion, sendMessage, answerQuestion, setMessages };
+  return { messages, isStreaming, isLoadingHistory, error, pendingQuestion, sendMessage, answerQuestion, setMessages };
 }
 
 /** Extract all content blocks from an Anthropic message. */

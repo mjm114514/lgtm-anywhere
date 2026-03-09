@@ -1,4 +1,4 @@
-import { query, type Query, type SDKMessage, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
+import { query, getSessionMessages, type Query, type SDKMessage, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import type WebSocket from "ws";
@@ -26,7 +26,7 @@ export interface ActiveSession {
     input: Record<string, unknown>;
     resolve: (answers: Record<string, string>) => void;
   }>;
-  /** Cache of WS messages sent since the last assistant message (for reconnect replay) */
+  /** Full cache of WS events (history + runtime) for the session lifetime */
   messageCache: Array<{ event: string; data: unknown }>;
 }
 
@@ -123,7 +123,7 @@ export class SessionManager extends EventEmitter {
     session.messageQueue.push(options.message);
 
     // Cache the first user message as pending (not yet persisted)
-    session.messageCache.push({ event: "pending_message", data: { message: options.message } });
+    session.messageCache.push({ event: "session_message", data: { message: options.message } });
 
     // Start consuming messages in the background (handles init + ongoing)
     this.runSession(session, q);
@@ -148,7 +148,7 @@ export class SessionManager extends EventEmitter {
     }
 
     // Cache and broadcast the user message as pending (not yet persisted by SDK).
-    const pending = { event: "pending_message", data: { message } };
+    const pending = { event: "session_message", data: { message } };
     session.messageCache.push(pending);
     this.broadcast(session, pending.event, pending.data);
 
@@ -205,11 +205,12 @@ export class SessionManager extends EventEmitter {
     this.activeSessions.set(sessionId, session);
     this.emit("session_state", { sessionId, state: "active" as SessionState });
 
-    // Push the first message immediately
-    session.messageQueue.push(firstMessage);
+    // Seed cache with history so WS subscribers get full conversation on replay
+    const historyEvents = await this.convertHistoryToWSEvents(sessionId);
+    session.messageCache = historyEvents;
 
-    // Cache the first user message as pending (not yet persisted)
-    session.messageCache.push({ event: "pending_message", data: { message: firstMessage } });
+    // Push the first message immediately (caching is handled by sendMessage)
+    session.messageQueue.push(firstMessage);
 
     // Start consuming in the background (init will be handled inline)
     this.runSession(session, q);
@@ -217,15 +218,19 @@ export class SessionManager extends EventEmitter {
     return session;
   }
 
-  subscribeWS(sessionId: string, ws: WebSocket): void {
+  subscribeWS(sessionId: string, ws: WebSocket): boolean {
     const session = this.activeSessions.get(sessionId);
-    if (session) {
-      // Replay cached streaming messages to the new client before subscribing
-      for (const cached of session.messageCache) {
-        this.sendWS(ws, cached.event, cached.data);
-      }
-      session.wsClients.add(ws);
+    if (!session) return false;
+
+    // Replay cached messages wrapped in batch markers
+    this.sendWS(ws, "history_batch_start", { messageCount: session.messageCache.length });
+    for (const cached of session.messageCache) {
+      this.sendWS(ws, cached.event, cached.data);
     }
+    this.sendWS(ws, "history_batch_end", {});
+
+    session.wsClients.add(ws);
+    return true;
   }
 
   unsubscribeWS(sessionId: string, ws: WebSocket): void {
@@ -273,6 +278,40 @@ export class SessionManager extends EventEmitter {
     pending.resolve(answers);
     session.pendingQuestions.delete(requestId);
     return true;
+  }
+
+  /**
+   * Convert persisted session messages from the SDK into WS events for replay.
+   */
+  async convertHistoryToWSEvents(sessionId: string): Promise<Array<{ event: string; data: unknown }>> {
+    const messages = await getSessionMessages(sessionId, { limit: 1000 });
+    const events: Array<{ event: string; data: unknown }> = [];
+
+    for (const m of messages) {
+      if (m.type === "assistant") {
+        events.push({
+          event: "assistant",
+          data: { type: "assistant", uuid: m.uuid, message: m.message },
+        });
+      } else if (m.type === "user") {
+        if (isToolResultMessage(m.message)) {
+          events.push({
+            event: "tool_result",
+            data: { type: "user", uuid: m.uuid, message: m.message },
+          });
+        } else {
+          const text = extractUserText(m.message);
+          if (text) {
+            events.push({
+              event: "session_message",
+              data: { message: text },
+            });
+          }
+        }
+      }
+    }
+
+    return events;
   }
 
   /**
@@ -421,15 +460,7 @@ export class SessionManager extends EventEmitter {
 
         const mapped = this.mapMessageToEvent(message);
         if (mapped) {
-          // Cache management for reconnect replay:
-          // - "assistant" means the preceding stream_events are now persisted → clear cache
-          // - Then cache everything that's part of the in-flight turn
-          // - "result" means the entire turn is persisted → clear cache
-          if (message.type === "assistant") {
-            session.messageCache = [];
-          }
-
-          // Cache all broadcastable events (they'll be cleared on next assistant or result)
+          // Cache all broadcastable events (cache persists for session lifetime)
           session.messageCache.push(mapped);
 
           this.broadcast(session, mapped.event, mapped.data);
@@ -437,7 +468,6 @@ export class SessionManager extends EventEmitter {
 
         // result means this turn is done → IDLE
         if (message.type === "result") {
-          session.messageCache = [];
           session.state = "idle";
           session.lastActivityAt = Date.now();
           this.emit("session_state", { sessionId: session.sessionId, state: "idle" as SessionState });
@@ -476,4 +506,28 @@ export class SessionManager extends EventEmitter {
     );
     await Promise.all(stops);
   }
+}
+
+/** Check if a user message contains tool_result content blocks. */
+function isToolResultMessage(message: unknown): boolean {
+  if (!message || typeof message !== "object") return false;
+  const msg = message as Record<string, unknown>;
+  if (!Array.isArray(msg.content)) return false;
+  return (msg.content as Array<Record<string, unknown>>).some(
+    (b) => b.type === "tool_result"
+  );
+}
+
+/** Extract plain text from a user message. */
+function extractUserText(message: unknown): string {
+  if (!message || typeof message !== "object") return "";
+  const msg = message as Record<string, unknown>;
+  if (typeof msg.content === "string") return msg.content;
+  if (Array.isArray(msg.content)) {
+    return (msg.content as Array<Record<string, unknown>>)
+      .filter((b) => b.type === "text" && typeof b.text === "string")
+      .map((b) => b.text as string)
+      .join("");
+  }
+  return "";
 }

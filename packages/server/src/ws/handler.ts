@@ -50,13 +50,33 @@ function sendError(ws: WebSocket, error: string, code: string): void {
   }
 }
 
-function handleConnection(
+function sendWS(ws: WebSocket, event: string, data: unknown): void {
+  if (ws.readyState === ws.OPEN) {
+    ws.send(JSON.stringify({ event, data }));
+  }
+}
+
+async function handleConnection(
   ws: WebSocket,
   sessionId: string,
   sessionManager: SessionManager
-): void {
-  // Subscribe this WS client to the session's broadcast
-  sessionManager.subscribeWS(sessionId, ws);
+): Promise<void> {
+  // Try to subscribe to an active session (replays cache wrapped in batch markers)
+  const isActive = sessionManager.subscribeWS(sessionId, ws);
+
+  if (!isActive) {
+    // Session is inactive — fetch history from SDK and send via WS
+    try {
+      const historyEvents = await sessionManager.convertHistoryToWSEvents(sessionId);
+      sendWS(ws, "history_batch_start", { messageCount: historyEvents.length });
+      for (const evt of historyEvents) {
+        sendWS(ws, evt.event, evt.data);
+      }
+      sendWS(ws, "history_batch_end", {});
+    } catch {
+      sendError(ws, "Failed to load session history", "HISTORY_ERROR");
+    }
+  }
 
   ws.on("message", async (raw) => {
     let msg: WSClientMessage;
@@ -95,9 +115,9 @@ function handleConnection(
           cwd = info.cwd;
         }
 
-        const session = await sessionManager.sendMessage(sessionId, msg.message, cwd);
-        // Ensure this WS is subscribed (may be a new session after reactivation)
-        session.wsClients.add(ws);
+        await sessionManager.sendMessage(sessionId, msg.message, cwd);
+        // Subscribe via sessionManager to get batch-wrapped cache replay
+        sessionManager.subscribeWS(sessionId, ws);
       } catch (err) {
         sendError(
           ws,
