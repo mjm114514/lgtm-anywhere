@@ -378,6 +378,19 @@ export class SessionManager extends EventEmitter {
     }
   }
 
+  /**
+   * Remove all cached events of the given type from the cache.
+   * Called when a finalized message arrives that supersedes transient events
+   * (e.g., stream_event deltas are superseded by the complete assistant message).
+   */
+  private pruneCache(cache: Array<{ event: string; data: unknown }>, eventType: string): void {
+    for (let i = cache.length - 2; i >= 0; i--) {
+      if (cache[i].event === eventType) {
+        cache.splice(i, 1);
+      }
+    }
+  }
+
   private mapMessageToEvent(message: SDKMessage): { event: string; data: unknown } | null {
     switch (message.type) {
       case "system":
@@ -443,9 +456,10 @@ export class SessionManager extends EventEmitter {
         };
 
       default: {
-        // tool_progress, status, etc. — forward as-is
+        // tool_progress — forward as-is (will be pruned from cache when tool_result arrives)
+        // status — transient, handled separately (broadcast live but not cached)
         const type = (message as any).type;
-        if (type === "tool_progress" || type === "status") {
+        if (type === "tool_progress") {
           return { event: type, data: message };
         }
         return null;
@@ -476,10 +490,28 @@ export class SessionManager extends EventEmitter {
           session.resolveSessionId(message.session_id);
         }
 
+        // Status events are transient — broadcast live but don't cache
+        // (they have no replay value for reconnecting clients)
+        if ((message as any).type === "status") {
+          this.broadcast(session, "status", message);
+        }
+
         const mapped = this.mapMessageToEvent(message);
         if (mapped) {
-          // Cache all broadcastable events (cache persists for session lifetime)
           session.messageCache.push(mapped);
+
+          // When a complete assistant message arrives, remove preceding
+          // stream_event chunks from cache — the assistant message contains
+          // the final content, so streaming deltas are redundant for replay.
+          if (mapped.event === "assistant") {
+            this.pruneCache(session.messageCache, "stream_event");
+          }
+
+          // When a tool_result arrives, remove preceding tool_progress
+          // events — they are transient progress indicators.
+          if (mapped.event === "tool_result") {
+            this.pruneCache(session.messageCache, "tool_progress");
+          }
 
           this.broadcast(session, mapped.event, mapped.data);
         }
