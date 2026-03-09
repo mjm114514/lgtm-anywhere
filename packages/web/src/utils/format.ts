@@ -29,7 +29,7 @@ export function extractTextContent(message: unknown): string {
 }
 
 export function extractToolUse(
-  message: unknown
+  message: unknown,
 ): Array<{ name: string; id: string; input: unknown }> {
   if (!message || typeof message !== "object") return [];
   const msg = message as Record<string, unknown>;

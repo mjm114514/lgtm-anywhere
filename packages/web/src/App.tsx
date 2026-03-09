@@ -12,7 +12,7 @@ export default function App() {
   const [selectedProject, setSelectedProject] =
     useState<SelectedProject | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
-    null
+    null,
   );
   const [showNewSession, setShowNewSession] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

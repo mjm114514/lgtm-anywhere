@@ -83,6 +83,7 @@ server/src/routes/
 ```
 
 路由设计原则：
+
 - **`/api/projects`** — 聚合视图，从 `listSessions({})` 按 cwd 聚合
 - **`/api/sessions?cwd=...`** — 需要 cwd 的操作通过 query parameter 传递
 - **`/api/sessions/:session_id`** — session 级操作不需要 cwd（session_id 全局唯一）
@@ -189,11 +190,11 @@ SessionManager
   └─────────┘            └─────────┘                └──────────┘
 ```
 
-| 状态 | 内存中有 Query? | 子进程? | 触发条件 |
-|------|:---:|:---:|------|
-| **ACTIVE** | 是 | 运行中 | 新建 session 或推入消息 |
-| **IDLE** | 是 | 运行中 | 收到 `result`（Claude 完成本轮） |
-| **INACTIVE** | 否 | 无 | idle 超时 / DELETE / server 重启 |
+| 状态         | 内存中有 Query? | 子进程? | 触发条件                         |
+| ------------ | :-------------: | :-----: | -------------------------------- |
+| **ACTIVE**   |       是        | 运行中  | 新建 session 或推入消息          |
+| **IDLE**     |       是        | 运行中  | 收到 `result`（Claude 完成本轮） |
+| **INACTIVE** |       否        |   无    | idle 超时 / DELETE / server 重启 |
 
 回收策略：仅按 idle 超时回收（默认 5 分钟）。不限制活跃 session 数量，不限制单 session 存活时间。
 

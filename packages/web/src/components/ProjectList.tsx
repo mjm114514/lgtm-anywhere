@@ -17,7 +17,6 @@ export function ProjectList({ selectedCwd, onSelect }: ProjectListProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetchProjects()
       .then((data) => {
         if (!cancelled) {
@@ -41,7 +40,9 @@ export function ProjectList({ selectedCwd, onSelect }: ProjectListProps) {
   }
 
   if (error) {
-    return <div className="project-list-status project-list-error">{error}</div>;
+    return (
+      <div className="project-list-status project-list-error">{error}</div>
+    );
   }
 
   if (projects.length === 0) {

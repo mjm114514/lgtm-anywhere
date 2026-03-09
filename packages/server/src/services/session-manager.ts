@@ -4,6 +4,13 @@ import {
   type Query,
   type SDKMessage,
   type CanUseTool,
+  type SDKSystemMessage,
+  type SDKAssistantMessage,
+  type SDKPartialAssistantMessage,
+  type SDKUserMessage,
+  type SDKUserMessageReplay,
+  type SDKResultMessage,
+  type PermissionMode,
 } from "@anthropic-ai/claude-agent-sdk";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
@@ -138,7 +145,8 @@ export class SessionManager extends EventEmitter {
       options: {
         cwd,
         model: options.model,
-        permissionMode: (options.permissionMode as any) ?? "bypassPermissions",
+        permissionMode:
+          (options.permissionMode as PermissionMode) ?? "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         allowedTools: options.allowedTools,
         systemPrompt: options.systemPrompt,
@@ -470,76 +478,84 @@ export class SessionManager extends EventEmitter {
   ): { event: string; data: unknown } | null {
     switch (message.type) {
       case "system":
-        if ("subtype" in message && message.subtype === "init") {
+        if (message.subtype === "init") {
+          const initMsg = message as SDKSystemMessage;
           return {
             event: "init",
             data: {
-              sessionId: message.session_id,
-              cwd: (message as any).cwd,
-              model: (message as any).model,
+              sessionId: initMsg.session_id,
+              cwd: initMsg.cwd,
+              model: initMsg.model,
             },
           };
         }
         return null;
 
-      case "assistant":
+      case "assistant": {
+        const assistantMsg = message as SDKAssistantMessage;
         return {
           event: "assistant",
           data: {
             type: "assistant",
-            uuid: message.uuid,
-            message: (message as any).message,
+            uuid: assistantMsg.uuid,
+            message: assistantMsg.message,
           },
         };
+      }
 
-      case "stream_event":
+      case "stream_event": {
+        const streamMsg = message as SDKPartialAssistantMessage;
         return {
           event: "stream_event",
           data: {
             type: "stream_event",
-            event: (message as any).event,
-            parent_tool_use_id: (message as any).parent_tool_use_id,
+            event: streamMsg.event,
+            parent_tool_use_id: streamMsg.parent_tool_use_id,
           },
         };
+      }
 
-      case "user":
+      case "user": {
         // Tool results
-        if ((message as any).tool_use_result !== undefined) {
+        const userMsg = message as SDKUserMessage | SDKUserMessageReplay;
+        if (userMsg.tool_use_result !== undefined) {
           return {
             event: "tool_result",
             data: {
               type: "user",
-              uuid: message.uuid,
-              message: (message as any).message,
-              tool_use_result: (message as any).tool_use_result,
+              uuid: userMsg.uuid,
+              message: userMsg.message,
+              tool_use_result: userMsg.tool_use_result,
             },
           };
         }
         return null;
+      }
 
-      case "result":
+      case "result": {
+        const resultMsg = message as SDKResultMessage;
         return {
           event: "result",
           data: {
-            subtype: (message as any).subtype,
-            result: (message as any).result,
-            session_id: message.session_id,
-            total_cost_usd: (message as any).total_cost_usd,
-            duration_ms: (message as any).duration_ms,
-            num_turns: (message as any).num_turns,
-            errors: (message as any).errors,
+            subtype: resultMsg.subtype,
+            result:
+              resultMsg.subtype === "success" ? resultMsg.result : undefined,
+            session_id: resultMsg.session_id,
+            total_cost_usd: resultMsg.total_cost_usd,
+            duration_ms: resultMsg.duration_ms,
+            num_turns: resultMsg.num_turns,
+            errors:
+              resultMsg.subtype !== "success" ? resultMsg.errors : undefined,
           },
         };
-
-      default: {
-        // tool_progress — forward as-is (will be pruned from cache when tool_result arrives)
-        // status — transient, handled separately (broadcast live but not cached)
-        const type = (message as any).type;
-        if (type === "tool_progress") {
-          return { event: type, data: message };
-        }
-        return null;
       }
+
+      case "tool_progress": {
+        return { event: "tool_progress", data: message };
+      }
+
+      default:
+        return null;
     }
   }
 
@@ -574,7 +590,11 @@ export class SessionManager extends EventEmitter {
 
         // Status events are transient — broadcast live but don't cache
         // (they have no replay value for reconnecting clients)
-        if ((message as any).type === "status") {
+        if (
+          message.type === "system" &&
+          "subtype" in message &&
+          message.subtype === "status"
+        ) {
           this.broadcast(session, "status", message);
         }
 
@@ -605,7 +625,10 @@ export class SessionManager extends EventEmitter {
           const todos = extractTodosFromAssistant(message);
           if (todos) {
             session.currentTodos = todos;
-            const todoEvent = { event: "todo_update" as const, data: { todos } };
+            const todoEvent = {
+              event: "todo_update" as const,
+              data: { todos },
+            };
             session.messageCache.push(todoEvent);
             this.broadcast(session, todoEvent.event, todoEvent.data);
           }
@@ -688,7 +711,9 @@ function extractUserText(message: unknown): string {
  * Returns the todos array if a TodoWrite tool_use block is found, null otherwise.
  */
 function extractTodosFromAssistant(message: SDKMessage): TodoItem[] | null {
-  const msg = (message as any).message as Record<string, unknown> | undefined;
+  const msg = (message as SDKAssistantMessage).message as
+    | Record<string, unknown>
+    | undefined;
   if (!msg || !Array.isArray(msg.content)) return null;
 
   for (const block of msg.content as Array<Record<string, unknown>>) {

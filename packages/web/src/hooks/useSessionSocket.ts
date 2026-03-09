@@ -50,22 +50,23 @@ export function useSessionSocket(
   const streamBufRef = useRef<{ id: string; text: string } | null>(null);
   const isLoadingHistoryRef = useRef(false);
 
-  useEffect(() => {
-    // Reset pending question whenever session changes
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on session change
+  // Reset state when sessionId changes (render-phase reset to avoid cascading renders)
+  const [prevSessionId, setPrevSessionId] = useState(sessionId);
+  if (prevSessionId !== sessionId) {
+    setPrevSessionId(sessionId);
     setPendingQuestion(null);
     setTodos([]);
+    setMessages([]);
+    setIsStreaming(false);
+    setError(null);
+  }
 
+  useEffect(() => {
     if (!sessionId) {
       wsRef.current?.close();
       wsRef.current = null;
       return;
     }
-
-    // Clear stale state from previous session
-    setMessages([]);
-    setIsStreaming(false);
-    setError(null);
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(

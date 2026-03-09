@@ -20,7 +20,9 @@ export function TodoPanel({ todos }: TodoPanelProps) {
         onClick={() => setOpen((v) => !v)}
         title={open ? "Hide tasks" : "Show tasks"}
       >
-        <span className="todo-float-tab-icon">{open ? "\u276f" : "\u276e"}</span>
+        <span className="todo-float-tab-icon">
+          {open ? "\u276f" : "\u276e"}
+        </span>
         {!open && (
           <span className="todo-float-tab-badge">
             {completed}/{todos.length}

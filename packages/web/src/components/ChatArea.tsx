@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { createSession } from "../api";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { MessageList } from "./MessageList";
@@ -36,14 +36,16 @@ export function ChatArea({
   const [createError, setCreateError] = useState<string | null>(null);
   const messageListRef = useRef<MessageListHandle>(null);
 
-  // Reset create state when switching away from new session
-  useEffect(() => {
+  // Reset create state when switching away from new session.
+  // Track prev value via state so React batches the reset into the same render.
+  const [prevShowNewSession, setPrevShowNewSession] = useState(showNewSession);
+  if (prevShowNewSession !== showNewSession) {
+    setPrevShowNewSession(showNewSession);
     if (!showNewSession) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on prop change
       setCreating(false);
       setCreateError(null);
     }
-  }, [showNewSession]);
+  }
 
   const handleNewSessionSend = async (text: string, model?: string) => {
     if (!selectedProject || creating) return;

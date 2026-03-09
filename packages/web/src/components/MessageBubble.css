@@ -67,7 +67,8 @@
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 13px;
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
 }
 
 .timeline-text pre {
@@ -95,10 +96,18 @@
   font-weight: 600;
 }
 
-.timeline-text h1 { font-size: 18px; }
-.timeline-text h2 { font-size: 16px; }
-.timeline-text h3 { font-size: 15px; }
-.timeline-text h4 { font-size: 14px; }
+.timeline-text h1 {
+  font-size: 18px;
+}
+.timeline-text h2 {
+  font-size: 16px;
+}
+.timeline-text h3 {
+  font-size: 15px;
+}
+.timeline-text h4 {
+  font-size: 14px;
+}
 
 .timeline-text ul,
 .timeline-text ol {
@@ -161,8 +170,14 @@
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* ── Tool block ── */
@@ -182,13 +197,15 @@
 
 .tool-name {
   font-weight: 700;
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
   color: #1a1a1a;
 }
 
 .tool-input-summary {
   color: #666;
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -221,7 +238,8 @@
   line-height: 1.4;
   overflow-x: auto;
   color: #444;
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
 }
 
 /* ── Tool result ── */
@@ -241,7 +259,8 @@
   color: #666;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
 }
 
 .tool-result-toggle {

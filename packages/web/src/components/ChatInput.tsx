@@ -9,7 +9,8 @@ const MODEL_OPTIONS = [
 ];
 
 const isMac =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad/.test(navigator.userAgent);
 
 interface ChatInputProps {
   onSend: (text: string, model?: string) => void;

@@ -11,7 +11,10 @@ export function createApp(sessionManager: SessionManager) {
   // CORS for local development
   app.use((_req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS",
+    );
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     if (_req.method === "OPTIONS") {
       res.sendStatus(204);
@@ -27,20 +30,20 @@ export function createApp(sessionManager: SessionManager) {
   // Error handling middleware
   app.use(
     (
-      err: Error,
+      err: Error & { statusCode?: number; code?: string },
       _req: express.Request,
       res: express.Response,
-      _next: express.NextFunction
+      _next: express.NextFunction,
     ) => {
       console.error("[error]", err);
-      const statusCode = (err as any).statusCode ?? 500;
+      const statusCode = err.statusCode ?? 500;
       res.status(statusCode).json({
         error: {
-          code: (err as any).code ?? "INTERNAL_ERROR",
+          code: err.code ?? "INTERNAL_ERROR",
           message: err.message,
         },
       });
-    }
+    },
   );
 
   return app;

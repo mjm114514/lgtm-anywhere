@@ -1,4 +1,10 @@
-import { useImperativeHandle, forwardRef, useRef, useEffect, useCallback } from "react";
+import {
+  useImperativeHandle,
+  forwardRef,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import { MessageBubble } from "./MessageBubble";
 import type { ChatMessage } from "../hooks/useSessionSocket";
 import "./MessageList.css";
@@ -31,7 +37,8 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(
       const el = containerRef.current;
       if (!el) return;
       isNearBottomRef.current =
-        el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_THRESHOLD;
+        el.scrollHeight - el.scrollTop - el.clientHeight <
+        NEAR_BOTTOM_THRESHOLD;
     }, []);
 
     // Auto-scroll when messages change, but only if user is near bottom
@@ -57,5 +64,5 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(
         <div ref={endRef} className="message-list-anchor" />
       </div>
     );
-  }
+  },
 );

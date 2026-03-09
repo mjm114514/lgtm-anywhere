@@ -10,8 +10,12 @@ const sessionManager = new SessionManager();
 const app = createApp(sessionManager);
 
 const server = app.listen(config.port, () => {
-  console.log(`[lgtm-anywhere] Server listening on http://localhost:${config.port}`);
-  console.log(`[lgtm-anywhere] WebSocket at ws://localhost:${config.port}/ws/sessions/:session_id`);
+  console.log(
+    `[lgtm-anywhere] Server listening on http://localhost:${config.port}`,
+  );
+  console.log(
+    `[lgtm-anywhere] WebSocket at ws://localhost:${config.port}/ws/sessions/:session_id`,
+  );
 });
 
 // Attach WebSocket handler to the same HTTP server
