@@ -119,9 +119,14 @@ export interface WSAskUserQuestionMessage {
 
 // ── Global sync WebSocket: Server → Client ──
 
-export type WSSyncMessage = WSSessionStateChange;
+export type WSSyncMessage = WSSessionStateChange | WSSessionCreated;
 
 export interface WSSessionStateChange {
   event: "session_state";
   data: { sessionId: string; state: import("./session.js").SessionState };
+}
+
+export interface WSSessionCreated {
+  event: "session_created";
+  data: { sessionId: string; cwd: string };
 }
