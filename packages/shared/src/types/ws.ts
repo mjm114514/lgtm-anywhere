@@ -134,7 +134,7 @@ export interface WSHistoryBatchStart {
 
 export interface WSHistoryBatchEnd {
   event: "history_batch_end";
-  data: {};
+  data: Record<string, never>;
 }
 
 // ── Global sync WebSocket: Server → Client ──

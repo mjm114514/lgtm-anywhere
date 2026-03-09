@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { createSession } from "../api";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { MessageList } from "./MessageList";
@@ -21,19 +21,29 @@ export function ChatArea({
   showNewSession,
   onSessionCreated,
 }: ChatAreaProps) {
-  const { messages, isStreaming, isLoadingHistory, error, pendingQuestion, sendMessage, answerQuestion } =
-    useSessionSocket(selectedSessionId);
+  const {
+    messages,
+    isStreaming,
+    isLoadingHistory,
+    error,
+    pendingQuestion,
+    sendMessage,
+    answerQuestion,
+  } = useSessionSocket(selectedSessionId);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const messageListRef = useRef<MessageListHandle>(null);
 
-  // Reset create state when switching away from new session
-  useEffect(() => {
+  // Reset create state when switching away from new session.
+  // Track prev value via state so React batches the reset into the same render.
+  const [prevShowNewSession, setPrevShowNewSession] = useState(showNewSession);
+  if (prevShowNewSession !== showNewSession) {
+    setPrevShowNewSession(showNewSession);
     if (!showNewSession) {
       setCreating(false);
       setCreateError(null);
     }
-  }, [showNewSession]);
+  }
 
   const handleNewSessionSend = async (text: string, model?: string) => {
     if (!selectedProject || creating) return;
@@ -47,7 +57,7 @@ export function ChatArea({
       onSessionCreated(res.sessionId);
     } catch (err) {
       setCreateError(
-        err instanceof Error ? err.message : "Failed to create session"
+        err instanceof Error ? err.message : "Failed to create session",
       );
       setCreating(false);
     }
@@ -61,7 +71,7 @@ export function ChatArea({
         messageListRef.current?.scrollToBottom();
       });
     },
-    [sendMessage]
+    [sendMessage],
   );
 
   // New session: same layout as active chat, but empty messages + model selector
@@ -69,7 +79,11 @@ export function ChatArea({
     return (
       <div className="chat-area">
         {createError && <div className="chat-area-error">{createError}</div>}
-        <MessageList messages={[]} isStreaming={false} cwd={selectedProject.cwd} />
+        <MessageList
+          messages={[]}
+          isStreaming={false}
+          cwd={selectedProject.cwd}
+        />
         <ChatInput
           onSend={handleNewSessionSend}
           disabled={creating}
@@ -98,14 +112,22 @@ export function ChatArea({
   return (
     <div className="chat-area">
       {error && <div className="chat-area-error">{error}</div>}
-      <MessageList ref={messageListRef} messages={messages} isStreaming={isStreaming} cwd={selectedProject?.cwd} />
+      <MessageList
+        ref={messageListRef}
+        messages={messages}
+        isStreaming={isStreaming}
+        cwd={selectedProject?.cwd}
+      />
       {pendingQuestion && (
         <AskUserQuestion
           pendingQuestion={pendingQuestion}
           onAnswer={answerQuestion}
         />
       )}
-      <ChatInput onSend={handleSend} disabled={isStreaming || isLoadingHistory} />
+      <ChatInput
+        onSend={handleSend}
+        disabled={isStreaming || isLoadingHistory}
+      />
     </div>
   );
 }

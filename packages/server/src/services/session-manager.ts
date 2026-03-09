@@ -1,4 +1,17 @@
-import { query, getSessionMessages, type Query, type SDKMessage, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
+import {
+  query,
+  getSessionMessages,
+  type Query,
+  type SDKMessage,
+  type CanUseTool,
+  type SDKSystemMessage,
+  type SDKAssistantMessage,
+  type SDKPartialAssistantMessage,
+  type SDKUserMessage,
+  type SDKUserMessageReplay,
+  type SDKResultMessage,
+  type PermissionMode,
+} from "@anthropic-ai/claude-agent-sdk";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import type WebSocket from "ws";
@@ -22,10 +35,13 @@ export interface ActiveSession {
   /** Call this to resolve sessionIdReady (set internally) */
   resolveSessionId: (id: string) => void;
   /** Pending AskUserQuestion requests awaiting user answers */
-  pendingQuestions: Map<string, {
-    input: Record<string, unknown>;
-    resolve: (answers: Record<string, string>) => void;
-  }>;
+  pendingQuestions: Map<
+    string,
+    {
+      input: Record<string, unknown>;
+      resolve: (answers: Record<string, string>) => void;
+    }
+  >;
   /** Full cache of WS events (history + runtime) for the session lifetime */
   messageCache: Array<{ event: string; data: unknown }>;
 }
@@ -39,7 +55,10 @@ export interface CreateSessionOptions {
   maxTurns?: number;
 }
 
-function makeSessionIdHook(): Pick<ActiveSession, "sessionIdReady" | "resolveSessionId"> {
+function makeSessionIdHook(): Pick<
+  ActiveSession,
+  "sessionIdReady" | "resolveSessionId"
+> {
   let resolveSessionId!: (id: string) => void;
   const sessionIdReady = new Promise<string>((resolve) => {
     resolveSessionId = resolve;
@@ -53,7 +72,10 @@ export class SessionManager extends EventEmitter {
 
   constructor() {
     super();
-    this.recycleTimer = setInterval(() => this.recycle(), config.recycleIntervalMs);
+    this.recycleTimer = setInterval(
+      () => this.recycle(),
+      config.recycleIntervalMs,
+    );
   }
 
   getState(sessionId: string): SessionState {
@@ -86,7 +108,7 @@ export class SessionManager extends EventEmitter {
 
   async createSession(
     cwd: string,
-    options: CreateSessionOptions
+    options: CreateSessionOptions,
   ): Promise<ActiveSession> {
     const messageQueue = new MessageQueue();
     const abortController = new AbortController();
@@ -110,13 +132,14 @@ export class SessionManager extends EventEmitter {
       messageCache: [],
     };
 
-    console.log("start query")
+    console.log("start query");
     const q = query({
       prompt: messageQueue,
       options: {
         cwd,
         model: options.model,
-        permissionMode: (options.permissionMode as any) ?? "bypassPermissions",
+        permissionMode:
+          (options.permissionMode as PermissionMode) ?? "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         allowedTools: options.allowedTools,
         systemPrompt: options.systemPrompt,
@@ -126,7 +149,7 @@ export class SessionManager extends EventEmitter {
         canUseTool: this.makeCanUseTool(session),
       },
     });
-    console.log("query created")
+    console.log("query created");
 
     session.query = q;
 
@@ -134,19 +157,22 @@ export class SessionManager extends EventEmitter {
     session.messageQueue.push(options.message);
 
     // Cache the first user message (not yet persisted)
-    session.messageCache.push({ event: "session_message", data: { message: options.message } });
+    session.messageCache.push({
+      event: "session_message",
+      data: { message: options.message },
+    });
 
     // Start consuming messages in the background (handles init + ongoing)
     this.runSession(session, q);
 
-    console.log("session created, waiting for sessionId via sessionIdReady")
+    console.log("session created, waiting for sessionId via sessionIdReady");
     return session;
   }
 
   async sendMessage(
     sessionId: string,
     message: string,
-    cwd: string
+    cwd: string,
   ): Promise<ActiveSession> {
     let session = this.activeSessions.get(sessionId);
 
@@ -165,7 +191,10 @@ export class SessionManager extends EventEmitter {
 
     session.state = "active";
     session.lastActivityAt = Date.now();
-    this.emit("session_state", { sessionId: session.sessionId, state: "active" as SessionState });
+    this.emit("session_state", {
+      sessionId: session.sessionId,
+      state: "active" as SessionState,
+    });
 
     return session;
   }
@@ -173,7 +202,7 @@ export class SessionManager extends EventEmitter {
   private async reactivateSession(
     sessionId: string,
     cwd: string,
-    firstMessage: string
+    firstMessage: string,
   ): Promise<ActiveSession> {
     const messageQueue = new MessageQueue();
     const abortController = new AbortController();
@@ -234,7 +263,9 @@ export class SessionManager extends EventEmitter {
     if (!session) return false;
 
     // Replay cached messages wrapped in batch markers
-    this.sendWS(ws, "history_batch_start", { messageCount: session.messageCache.length });
+    this.sendWS(ws, "history_batch_start", {
+      messageCount: session.messageCache.length,
+    });
     for (const cached of session.messageCache) {
       this.sendWS(ws, cached.event, cached.data);
     }
@@ -257,7 +288,10 @@ export class SessionManager extends EventEmitter {
 
     // Close all WebSocket connections
     for (const ws of session.wsClients) {
-      this.sendWS(ws, "error", { error: "Session stopped", code: "SESSION_STOPPED" });
+      this.sendWS(ws, "error", {
+        error: "Session stopped",
+        code: "SESSION_STOPPED",
+      });
       ws.close();
     }
     session.wsClients.clear();
@@ -267,7 +301,10 @@ export class SessionManager extends EventEmitter {
     session.query.close();
 
     this.activeSessions.delete(sessionId);
-    this.emit("session_state", { sessionId, state: "inactive" as SessionState });
+    this.emit("session_state", {
+      sessionId,
+      state: "inactive" as SessionState,
+    });
   }
 
   async setModel(sessionId: string, model: string): Promise<void> {
@@ -281,7 +318,11 @@ export class SessionManager extends EventEmitter {
   /**
    * Resolve a pending AskUserQuestion request with user-provided answers.
    */
-  resolveQuestion(sessionId: string, requestId: string, answers: Record<string, string>): boolean {
+  resolveQuestion(
+    sessionId: string,
+    requestId: string,
+    answers: Record<string, string>,
+  ): boolean {
     const session = this.activeSessions.get(sessionId);
     if (!session) return false;
     const pending = session.pendingQuestions.get(requestId);
@@ -294,7 +335,9 @@ export class SessionManager extends EventEmitter {
   /**
    * Convert persisted session messages from the SDK into WS events for replay.
    */
-  async convertHistoryToWSEvents(sessionId: string): Promise<Array<{ event: string; data: unknown }>> {
+  async convertHistoryToWSEvents(
+    sessionId: string,
+  ): Promise<Array<{ event: string; data: unknown }>> {
     const messages = await getSessionMessages(sessionId, { limit: 1000 });
     const events: Array<{ event: string; data: unknown }> = [];
 
@@ -336,7 +379,10 @@ export class SessionManager extends EventEmitter {
         const questions = (input.questions ?? []) as AskUserQuestionItem[];
 
         // Cache & broadcast question to all connected WS clients
-        const cached = { event: "ask_user_question", data: { requestId, questions } };
+        const cached = {
+          event: "ask_user_question",
+          data: { requestId, questions },
+        };
         session.messageCache.push(cached);
         this.broadcast(session, cached.event, cached.data);
 
@@ -369,7 +415,11 @@ export class SessionManager extends EventEmitter {
     }
   }
 
-  private broadcast(session: ActiveSession, event: string, data: unknown): void {
+  private broadcast(
+    session: ActiveSession,
+    event: string,
+    data: unknown,
+  ): void {
     const message = JSON.stringify({ event, data });
     for (const ws of session.wsClients) {
       if (ws.readyState === ws.OPEN) {
@@ -383,7 +433,10 @@ export class SessionManager extends EventEmitter {
    * Called when a finalized message arrives that supersedes transient events
    * (e.g., stream_event deltas are superseded by the complete assistant message).
    */
-  private pruneCache(cache: Array<{ event: string; data: unknown }>, eventType: string): void {
+  private pruneCache(
+    cache: Array<{ event: string; data: unknown }>,
+    eventType: string,
+  ): void {
     for (let i = cache.length - 2; i >= 0; i--) {
       if (cache[i].event === eventType) {
         cache.splice(i, 1);
@@ -391,79 +444,89 @@ export class SessionManager extends EventEmitter {
     }
   }
 
-  private mapMessageToEvent(message: SDKMessage): { event: string; data: unknown } | null {
+  private mapMessageToEvent(
+    message: SDKMessage,
+  ): { event: string; data: unknown } | null {
     switch (message.type) {
       case "system":
-        if ("subtype" in message && message.subtype === "init") {
+        if (message.subtype === "init") {
+          const initMsg = message as SDKSystemMessage;
           return {
             event: "init",
             data: {
-              sessionId: message.session_id,
-              cwd: (message as any).cwd,
-              model: (message as any).model,
+              sessionId: initMsg.session_id,
+              cwd: initMsg.cwd,
+              model: initMsg.model,
             },
           };
         }
         return null;
 
-      case "assistant":
+      case "assistant": {
+        const assistantMsg = message as SDKAssistantMessage;
         return {
           event: "assistant",
           data: {
             type: "assistant",
-            uuid: message.uuid,
-            message: (message as any).message,
+            uuid: assistantMsg.uuid,
+            message: assistantMsg.message,
           },
         };
+      }
 
-      case "stream_event":
+      case "stream_event": {
+        const streamMsg = message as SDKPartialAssistantMessage;
         return {
           event: "stream_event",
           data: {
             type: "stream_event",
-            event: (message as any).event,
-            parent_tool_use_id: (message as any).parent_tool_use_id,
+            event: streamMsg.event,
+            parent_tool_use_id: streamMsg.parent_tool_use_id,
           },
         };
+      }
 
-      case "user":
+      case "user": {
         // Tool results
-        if ((message as any).tool_use_result !== undefined) {
+        const userMsg = message as SDKUserMessage | SDKUserMessageReplay;
+        if (userMsg.tool_use_result !== undefined) {
           return {
             event: "tool_result",
             data: {
               type: "user",
-              uuid: message.uuid,
-              message: (message as any).message,
-              tool_use_result: (message as any).tool_use_result,
+              uuid: userMsg.uuid,
+              message: userMsg.message,
+              tool_use_result: userMsg.tool_use_result,
             },
           };
         }
         return null;
+      }
 
-      case "result":
+      case "result": {
+        const resultMsg = message as SDKResultMessage;
         return {
           event: "result",
           data: {
-            subtype: (message as any).subtype,
-            result: (message as any).result,
-            session_id: message.session_id,
-            total_cost_usd: (message as any).total_cost_usd,
-            duration_ms: (message as any).duration_ms,
-            num_turns: (message as any).num_turns,
-            errors: (message as any).errors,
+            subtype: resultMsg.subtype,
+            result:
+              resultMsg.subtype === "success" ? resultMsg.result : undefined,
+            session_id: resultMsg.session_id,
+            total_cost_usd: resultMsg.total_cost_usd,
+            duration_ms: resultMsg.duration_ms,
+            num_turns: resultMsg.num_turns,
+            errors:
+              resultMsg.subtype !== "success" ? resultMsg.errors : undefined,
           },
         };
-
-      default: {
-        // tool_progress — forward as-is (will be pruned from cache when tool_result arrives)
-        // status — transient, handled separately (broadcast live but not cached)
-        const type = (message as any).type;
-        if (type === "tool_progress") {
-          return { event: type, data: message };
-        }
-        return null;
       }
+
+      case "tool_progress": {
+        return { event: "tool_progress", data: message };
+      }
+
+      default:
+        return null;
     }
   }
 
@@ -484,15 +547,25 @@ export class SessionManager extends EventEmitter {
           if (!session.sessionId) {
             session.sessionId = message.session_id;
             this.activeSessions.set(session.sessionId, session);
-            this.emit("session_state", { sessionId: session.sessionId, state: "active" as SessionState });
-            this.emit("session_created", { sessionId: session.sessionId, cwd: session.cwd });
+            this.emit("session_state", {
+              sessionId: session.sessionId,
+              state: "active" as SessionState,
+            });
+            this.emit("session_created", {
+              sessionId: session.sessionId,
+              cwd: session.cwd,
+            });
           }
           session.resolveSessionId(message.session_id);
         }
 
         // Status events are transient — broadcast live but don't cache
         // (they have no replay value for reconnecting clients)
-        if ((message as any).type === "status") {
+        if (
+          message.type === "system" &&
+          "subtype" in message &&
+          message.subtype === "status"
+        ) {
           this.broadcast(session, "status", message);
         }
 
@@ -520,7 +593,10 @@ export class SessionManager extends EventEmitter {
         if (message.type === "result") {
           session.state = "idle";
           session.lastActivityAt = Date.now();
-          this.emit("session_state", { sessionId: session.sessionId, state: "idle" as SessionState });
+          this.emit("session_state", {
+            sessionId: session.sessionId,
+            state: "idle" as SessionState,
+          });
           // Don't break — generator stays alive, waiting for next message from queue
         }
       }
@@ -533,7 +609,10 @@ export class SessionManager extends EventEmitter {
 
     // Generator exited → process terminated
     this.activeSessions.delete(session.sessionId);
-    this.emit("session_state", { sessionId: session.sessionId, state: "inactive" as SessionState });
+    this.emit("session_state", {
+      sessionId: session.sessionId,
+      state: "inactive" as SessionState,
+    });
   }
 
   private recycle(): void {
@@ -552,7 +631,7 @@ export class SessionManager extends EventEmitter {
   async shutdown(): Promise<void> {
     clearInterval(this.recycleTimer);
     const stops = Array.from(this.activeSessions.keys()).map((id) =>
-      this.stopSession(id)
+      this.stopSession(id),
     );
     await Promise.all(stops);
   }
@@ -564,7 +643,7 @@ function isToolResultMessage(message: unknown): boolean {
   const msg = message as Record<string, unknown>;
   if (!Array.isArray(msg.content)) return false;
   return (msg.content as Array<Record<string, unknown>>).some(
-    (b) => b.type === "tool_result"
+    (b) => b.type === "tool_result",
   );
 }
 

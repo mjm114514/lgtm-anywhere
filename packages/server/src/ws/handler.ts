@@ -8,29 +8,41 @@ import { SessionManager } from "../services/session-manager.js";
 const WS_PATH_RE = /^\/ws\/sessions\/([^/]+)$/;
 const WS_SYNC_PATH_RE = /^\/ws\/sync$/;
 
-export function attachWebSocket(server: Server, sessionManager: SessionManager): void {
+export function attachWebSocket(
+  server: Server,
+  sessionManager: SessionManager,
+): void {
   const wss = new WebSocketServer({ noServer: true });
   const syncClients = new Set<WebSocket>();
 
   // Listen for session state changes and broadcast to all sync clients
-  sessionManager.on("session_state", (payload: { sessionId: string; state: SessionState }) => {
-    const message = JSON.stringify({ event: "session_state", data: payload });
-    for (const ws of syncClients) {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(message);
+  sessionManager.on(
+    "session_state",
+    (payload: { sessionId: string; state: SessionState }) => {
+      const message = JSON.stringify({ event: "session_state", data: payload });
+      for (const ws of syncClients) {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(message);
+        }
       }
-    }
-  });
+    },
+  );
 
   // Listen for new session creation and broadcast to all sync clients
-  sessionManager.on("session_created", (payload: { sessionId: string; cwd: string }) => {
-    const message = JSON.stringify({ event: "session_created", data: payload });
-    for (const ws of syncClients) {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(message);
+  sessionManager.on(
+    "session_created",
+    (payload: { sessionId: string; cwd: string }) => {
+      const message = JSON.stringify({
+        event: "session_created",
+        data: payload,
+      });
+      for (const ws of syncClients) {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(message);
+        }
       }
-    }
-  });
+    },
+  );
 
   server.on("upgrade", (req: IncomingMessage, socket, head) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
@@ -69,7 +81,7 @@ function sendWS(ws: WebSocket, event: string, data: unknown): void {
 async function handleConnection(
   ws: WebSocket,
   sessionId: string,
-  sessionManager: SessionManager
+  sessionManager: SessionManager,
 ): Promise<void> {
   // Try to subscribe to an active session (replays cache wrapped in batch markers)
   const isActive = sessionManager.subscribeWS(sessionId, ws);
@@ -77,7 +89,8 @@ async function handleConnection(
   if (!isActive) {
     // Session is inactive — fetch history from SDK and send via WS
     try {
-      const historyEvents = await sessionManager.convertHistoryToWSEvents(sessionId);
+      const historyEvents =
+        await sessionManager.convertHistoryToWSEvents(sessionId);
       sendWS(ws, "history_batch_start", { messageCount: historyEvents.length });
       for (const evt of historyEvents) {
         sendWS(ws, evt.event, evt.data);
@@ -105,7 +118,11 @@ async function handleConnection(
 
       const currentState = sessionManager.getState(sessionId);
       if (currentState === "active") {
-        sendError(ws, "Session is currently processing a message", "SESSION_BUSY");
+        sendError(
+          ws,
+          "Session is currently processing a message",
+          "SESSION_BUSY",
+        );
         return;
       }
 
@@ -132,7 +149,7 @@ async function handleConnection(
         sendError(
           ws,
           err instanceof Error ? err.message : "Unknown error",
-          "SEND_ERROR"
+          "SEND_ERROR",
         );
       }
     } else if (msg.type === "answer_question") {
@@ -140,12 +157,20 @@ async function handleConnection(
         sendError(ws, "requestId and answers are required", "INVALID_REQUEST");
         return;
       }
-      const resolved = sessionManager.resolveQuestion(sessionId, msg.requestId, msg.answers);
+      const resolved = sessionManager.resolveQuestion(
+        sessionId,
+        msg.requestId,
+        msg.answers,
+      );
       if (!resolved) {
         sendError(ws, "No pending question with that requestId", "NOT_FOUND");
       }
     } else {
-      sendError(ws, `Unknown message type: ${(msg as any).type}`, "UNKNOWN_TYPE");
+      sendError(
+        ws,
+        `Unknown message type: ${(msg as WSClientMessage & { type: string }).type}`,
+        "UNKNOWN_TYPE",
+      );
     }
   });
 
@@ -157,7 +182,7 @@ async function handleConnection(
 function handleSyncConnection(
   ws: WebSocket,
   syncClients: Set<WebSocket>,
-  sessionManager: SessionManager
+  sessionManager: SessionManager,
 ): void {
   syncClients.add(ws);
 

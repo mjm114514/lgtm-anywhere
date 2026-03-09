@@ -31,8 +31,15 @@ export function SessionList({
   const [error, setError] = useState<string | null>(null);
   const { getState, onSessionCreated } = useSessionSync();
 
-  const load = useCallback(() => {
+  // Reset loading state when cwd changes (render-phase reset)
+  const [prevCwd, setPrevCwd] = useState(cwd);
+  if (prevCwd !== cwd) {
+    setPrevCwd(cwd);
     setLoading(true);
+    setError(null);
+  }
+
+  const load = useCallback(() => {
     fetchSessions(cwd)
       .then((data) => {
         setSessions(data);
