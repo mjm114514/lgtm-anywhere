@@ -72,6 +72,8 @@ function buildTimelineItems(blocks: ContentBlock[]): TimelineEntry[] {
         items.push({ type: "text", text: b.text });
       }
     } else if (b.type === "tool_use") {
+      // Skip TodoWrite — displayed in the dedicated TodoPanel instead
+      if (b.name === "TodoWrite") continue;
       items.push({
         type: "tool",
         name: b.name,

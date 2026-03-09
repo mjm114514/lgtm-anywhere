@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type {
   WSServerMessage,
   AskUserQuestionItem,
+  TodoItem,
 } from "@lgtm-anywhere/shared";
 
 // A single content block in an assistant turn
@@ -29,6 +30,7 @@ interface UseSessionSocketReturn {
   isLoadingHistory: boolean;
   error: string | null;
   pendingQuestion: PendingQuestion | null;
+  todos: TodoItem[];
   sendMessage: (text: string) => void;
   answerQuestion: (requestId: string, answers: Record<string, string>) => void;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
@@ -43,6 +45,7 @@ export function useSessionSocket(
   const [error, setError] = useState<string | null>(null);
   const [pendingQuestion, setPendingQuestion] =
     useState<PendingQuestion | null>(null);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const streamBufRef = useRef<{ id: string; text: string } | null>(null);
   const isLoadingHistoryRef = useRef(false);
@@ -52,6 +55,7 @@ export function useSessionSocket(
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
     setPendingQuestion(null);
+    setTodos([]);
     setMessages([]);
     setIsStreaming(false);
     setError(null);
@@ -230,6 +234,11 @@ export function useSessionSocket(
           setIsLoadingHistory(false);
           break;
         }
+
+        case "todo_update": {
+          setTodos(msg.data.todos);
+          break;
+        }
       }
     };
 
@@ -270,6 +279,7 @@ export function useSessionSocket(
     isLoadingHistory,
     error,
     pendingQuestion,
+    todos,
     sendMessage,
     answerQuestion,
     setMessages,

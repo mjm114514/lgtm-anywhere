@@ -15,7 +15,11 @@ import {
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import type WebSocket from "ws";
-import type { SessionState, AskUserQuestionItem } from "@lgtm-anywhere/shared";
+import type {
+  SessionState,
+  AskUserQuestionItem,
+  TodoItem,
+} from "@lgtm-anywhere/shared";
 import { config } from "../config.js";
 import { MessageQueue } from "./message-queue.js";
 
@@ -44,6 +48,8 @@ export interface ActiveSession {
   >;
   /** Full cache of WS events (history + runtime) for the session lifetime */
   messageCache: Array<{ event: string; data: unknown }>;
+  /** Current todo list maintained via TodoWrite tool interceptions */
+  currentTodos: TodoItem[];
 }
 
 export interface CreateSessionOptions {
@@ -130,6 +136,7 @@ export class SessionManager extends EventEmitter {
       resolveSessionId,
       pendingQuestions: new Map(),
       messageCache: [],
+      currentTodos: [],
     };
 
     console.log("start query");
@@ -225,6 +232,7 @@ export class SessionManager extends EventEmitter {
       resolveSessionId,
       pendingQuestions: new Map(),
       messageCache: [],
+      currentTodos: [],
     };
 
     const q = query({
@@ -340,6 +348,7 @@ export class SessionManager extends EventEmitter {
   ): Promise<Array<{ event: string; data: unknown }>> {
     const messages = await getSessionMessages(sessionId, { limit: 1000 });
     const events: Array<{ event: string; data: unknown }> = [];
+    let lastTodos: TodoItem[] | null = null;
 
     for (const m of messages) {
       if (m.type === "assistant") {
@@ -347,6 +356,21 @@ export class SessionManager extends EventEmitter {
           event: "assistant",
           data: { type: "assistant", uuid: m.uuid, message: m.message },
         });
+
+        // Scan assistant message content blocks for the last TodoWrite tool_use
+        const msg = m.message as Record<string, unknown> | undefined;
+        if (msg && Array.isArray(msg.content)) {
+          for (const block of msg.content as Array<Record<string, unknown>>) {
+            if (block.type === "tool_use" && block.name === "TodoWrite") {
+              const blockInput = block.input as
+                | Record<string, unknown>
+                | undefined;
+              if (blockInput && Array.isArray(blockInput.todos)) {
+                lastTodos = blockInput.todos as TodoItem[];
+              }
+            }
+          }
+        }
       } else if (m.type === "user") {
         if (isToolResultMessage(m.message)) {
           events.push({
@@ -363,6 +387,11 @@ export class SessionManager extends EventEmitter {
           }
         }
       }
+    }
+
+    // Append the last todo state so clients can restore the todo panel
+    if (lastTodos) {
+      events.push({ event: "todo_update", data: { todos: lastTodos } });
     }
 
     return events;
@@ -589,6 +618,22 @@ export class SessionManager extends EventEmitter {
           this.broadcast(session, mapped.event, mapped.data);
         }
 
+        // Extract TodoWrite calls from assistant messages.
+        // canUseTool is never called for TodoWrite (SDK auto-allows it),
+        // so we detect it from the finalized assistant message content blocks.
+        if (message.type === "assistant") {
+          const todos = extractTodosFromAssistant(message);
+          if (todos) {
+            session.currentTodos = todos;
+            const todoEvent = {
+              event: "todo_update" as const,
+              data: { todos },
+            };
+            session.messageCache.push(todoEvent);
+            this.broadcast(session, todoEvent.event, todoEvent.data);
+          }
+        }
+
         // result means this turn is done → IDLE
         if (message.type === "result") {
           session.state = "idle";
@@ -659,4 +704,25 @@ function extractUserText(message: unknown): string {
       .join("");
   }
   return "";
+}
+
+/**
+ * Extract TodoWrite todos from an assistant SDK message.
+ * Returns the todos array if a TodoWrite tool_use block is found, null otherwise.
+ */
+function extractTodosFromAssistant(message: SDKMessage): TodoItem[] | null {
+  const msg = (message as SDKAssistantMessage).message as
+    | Record<string, unknown>
+    | undefined;
+  if (!msg || !Array.isArray(msg.content)) return null;
+
+  for (const block of msg.content as Array<Record<string, unknown>>) {
+    if (block.type === "tool_use" && block.name === "TodoWrite") {
+      const input = block.input as Record<string, unknown> | undefined;
+      if (input && Array.isArray(input.todos)) {
+        return input.todos as TodoItem[];
+      }
+    }
+  }
+  return null;
 }

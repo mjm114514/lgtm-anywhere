@@ -5,6 +5,7 @@ import { MessageList } from "./MessageList";
 import type { MessageListHandle } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { AskUserQuestion } from "./AskUserQuestion";
+import { TodoPanel } from "./TodoPanel";
 import type { SelectedProject } from "../App";
 import "./ChatArea.css";
 
@@ -27,6 +28,7 @@ export function ChatArea({
     isLoadingHistory,
     error,
     pendingQuestion,
+    todos,
     sendMessage,
     answerQuestion,
   } = useSessionSocket(selectedSessionId);
@@ -128,6 +130,7 @@ export function ChatArea({
         onSend={handleSend}
         disabled={isStreaming || isLoadingHistory}
       />
+      <TodoPanel todos={todos} />
     </div>
   );
 }
