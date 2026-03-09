@@ -15,6 +15,7 @@ export default function App() {
     null
   );
   const [showNewSession, setShowNewSession] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleSelectProject = (project: SelectedProject) => {
     setSelectedProject(project);
@@ -45,6 +46,8 @@ export default function App() {
         onSelectProject={handleSelectProject}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
       <ChatArea
         selectedProject={selectedProject}

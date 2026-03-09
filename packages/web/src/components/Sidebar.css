@@ -6,17 +6,56 @@
   border-right: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
+  transition: width 0.2s ease, min-width 0.2s ease;
+}
+
+.sidebar-collapsed {
+  width: 48px;
+  min-width: 48px;
 }
 
 .sidebar-header {
   padding: 16px;
   border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+  padding: 16px 8px;
 }
 
 .sidebar-title {
   font-size: 16px;
   font-weight: 600;
   color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-toggle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #f8f8f8;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+
+.sidebar-toggle:hover {
+  background: #eee;
+  color: #333;
 }
 
 .sidebar-upper {
@@ -28,6 +67,50 @@
 .sidebar-lower {
   flex: 1;
   overflow-y: auto;
+}
+
+/* Overlay-style scrollbars */
+.sidebar-upper,
+.sidebar-lower {
+  scrollbar-gutter: stable;
+}
+
+.sidebar-upper::-webkit-scrollbar,
+.sidebar-lower::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-upper::-webkit-scrollbar-track,
+.sidebar-lower::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-upper::-webkit-scrollbar-thumb,
+.sidebar-lower::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.sidebar-upper:hover::-webkit-scrollbar-thumb,
+.sidebar-lower:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-upper::-webkit-scrollbar-thumb:hover,
+.sidebar-lower::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* Firefox overlay-style scrollbar */
+.sidebar-upper,
+.sidebar-lower {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.sidebar-upper:hover,
+.sidebar-lower:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
 .sidebar-placeholder {
