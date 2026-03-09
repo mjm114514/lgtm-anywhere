@@ -180,6 +180,21 @@ export function useSessionSocket(
           streamBufRef.current = null;
           break;
         }
+
+        case "pending_message": {
+          const text = msg.data.message;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `user-${Date.now()}`,
+              role: "user",
+              content: text,
+              blocks: [{ type: "text", text }],
+            },
+          ]);
+          setIsStreaming(true);
+          break;
+        }
       }
     };
 
@@ -200,16 +215,6 @@ export function useSessionSocket(
   const sendMessage = useCallback(
     (text: string) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-      // Add user message to local state immediately
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `user-${Date.now()}`,
-          role: "user",
-          content: text,
-          blocks: [{ type: "text", text }],
-        },
-      ]);
       wsRef.current.send(JSON.stringify({ type: "message", message: text }));
       setIsStreaming(true);
     },
