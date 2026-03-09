@@ -335,13 +335,19 @@ export class SessionManager extends EventEmitter {
         const requestId = randomUUID();
         const questions = (input.questions ?? []) as AskUserQuestionItem[];
 
-        // Broadcast question to all connected WS clients
-        this.broadcast(session, "ask_user_question", { requestId, questions });
+        // Cache & broadcast question to all connected WS clients
+        const cached = { event: "ask_user_question", data: { requestId, questions } };
+        session.messageCache.push(cached);
+        this.broadcast(session, cached.event, cached.data);
 
         // Wait for the user to answer
         const answers = await new Promise<Record<string, string>>((resolve) => {
           session.pendingQuestions.set(requestId, { input, resolve });
         });
+
+        // Remove the cached question so it won't replay after being answered
+        const idx = session.messageCache.indexOf(cached);
+        if (idx !== -1) session.messageCache.splice(idx, 1);
 
         return {
           behavior: "allow" as const,
