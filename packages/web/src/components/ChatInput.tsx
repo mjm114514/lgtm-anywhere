@@ -1,4 +1,4 @@
-import { useState, useRef, type KeyboardEvent } from "react";
+import { useState, useRef, useMemo, type KeyboardEvent } from "react";
 import "./ChatInput.css";
 
 const MODEL_OPTIONS = [
@@ -8,20 +8,21 @@ const MODEL_OPTIONS = [
   { label: "Haiku", value: "claude-haiku-4-5-20251001" },
 ];
 
+const isMac =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+
 interface ChatInputProps {
   onSend: (text: string, model?: string) => void;
   disabled: boolean;
   placeholder?: string;
 }
 
-export function ChatInput({
-  onSend,
-  disabled,
-  placeholder,
-}: ChatInputProps) {
+export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   const [text, setText] = useState("");
   const [model, setModel] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const shortcutLabel = useMemo(() => (isMac ? "⌘↵" : "Ctrl↵"), []);
 
   const handleSend = () => {
     const trimmed = text.trim();
@@ -54,7 +55,7 @@ export function ChatInput({
 
   const defaultPlaceholder = disabled
     ? "Waiting for response..."
-    : "Type a message... (Ctrl+Enter to send)";
+    : "Type a message...";
 
   return (
     <div className="chat-input">
@@ -85,8 +86,9 @@ export function ChatInput({
         className="chat-input-send"
         onClick={handleSend}
         disabled={disabled || !text.trim()}
+        title={`Send (${isMac ? "⌘" : "Ctrl"}+Enter)`}
       >
-        Send
+        <kbd className="chat-input-send-shortcut">{shortcutLabel}</kbd>
       </button>
     </div>
   );
