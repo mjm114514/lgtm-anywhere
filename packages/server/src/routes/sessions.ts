@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { listSessions, getSessionMessages } from "@anthropic-ai/claude-agent-sdk";
+import {
+  listSessions,
+  getSessionMessages,
+} from "@anthropic-ai/claude-agent-sdk";
 import type {
   CreateSessionRequest,
   UpdateSessionRequest,
@@ -15,7 +18,10 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       const cwd = req.query.cwd as string | undefined;
       if (!cwd) {
         res.status(400).json({
-          error: { code: "INVALID_REQUEST", message: "cwd query parameter is required" },
+          error: {
+            code: "INVALID_REQUEST",
+            message: "cwd query parameter is required",
+          },
         });
         return;
       }
@@ -91,7 +97,10 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
       const cwd = req.query.cwd as string | undefined;
       if (!cwd) {
         res.status(400).json({
-          error: { code: "INVALID_REQUEST", message: "cwd query parameter is required" },
+          error: {
+            code: "INVALID_REQUEST",
+            message: "cwd query parameter is required",
+          },
         });
         return;
       }

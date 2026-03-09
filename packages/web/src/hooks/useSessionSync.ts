@@ -4,17 +4,23 @@ import type { SessionState, WSSyncMessage } from "@lgtm-anywhere/shared";
 interface UseSessionSyncReturn {
   stateMap: Map<string, SessionState>;
   getState: (sessionId: string) => SessionState | undefined;
-  onSessionCreated: (callback: (sessionId: string, cwd: string) => void) => () => void;
+  onSessionCreated: (
+    callback: (sessionId: string, cwd: string) => void,
+  ) => () => void;
 }
 
 export function useSessionSync(): UseSessionSyncReturn {
   const [stateMap, setStateMap] = useState<Map<string, SessionState>>(
-    new Map()
+    new Map(),
   );
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const sessionCreatedListeners = useRef<Set<(sessionId: string, cwd: string) => void>>(new Set());
+  const sessionCreatedListeners = useRef<
+    Set<(sessionId: string, cwd: string) => void>
+  >(new Set());
+
+  const connectRef = useRef<(() => void) | undefined>(undefined);
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -51,13 +57,17 @@ export function useSessionSync(): UseSessionSyncReturn {
       // Exponential backoff: 1s, 2s, 4s, 8s, …, max 30s
       const delay = Math.min(1000 * 2 ** retryRef.current, 30_000);
       retryRef.current++;
-      timerRef.current = setTimeout(connect, delay);
+      timerRef.current = setTimeout(() => connectRef.current?.(), delay);
     };
 
     ws.onerror = () => {
       // onclose will fire after onerror — reconnect handled there
     };
   }, []);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     connect();
@@ -71,7 +81,7 @@ export function useSessionSync(): UseSessionSyncReturn {
 
   const getState = useCallback(
     (sessionId: string) => stateMap.get(sessionId),
-    [stateMap]
+    [stateMap],
   );
 
   const onSessionCreated = useCallback(
@@ -81,7 +91,7 @@ export function useSessionSync(): UseSessionSyncReturn {
         sessionCreatedListeners.current.delete(callback);
       };
     },
-    []
+    [],
   );
 
   return { stateMap, getState, onSessionCreated };

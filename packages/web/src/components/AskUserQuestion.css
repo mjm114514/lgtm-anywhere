@@ -132,7 +132,9 @@
   border-radius: 6px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .ask-question-option:hover {
