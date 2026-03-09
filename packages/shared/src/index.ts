@@ -33,6 +33,7 @@ export type {
   AskUserQuestionItem,
   WSServerMessage,
   WSInitMessage,
+  WSSessionMessage,
   WSAssistantMessage,
   WSStreamEventMessage,
   WSToolResultMessage,
@@ -41,6 +42,9 @@ export type {
   WSStatusMessage,
   WSErrorMessage,
   WSAskUserQuestionMessage,
+  WSHistoryBatchStart,
+  WSHistoryBatchEnd,
   WSSyncMessage,
   WSSessionStateChange,
+  WSSessionCreated,
 } from "./types/ws.js";

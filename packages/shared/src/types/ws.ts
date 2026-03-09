@@ -32,7 +32,7 @@ export interface AskUserQuestionItem {
 
 export type WSServerMessage =
   | WSInitMessage
-  | WSPendingMessage
+  | WSSessionMessage
   | WSAssistantMessage
   | WSStreamEventMessage
   | WSToolResultMessage
@@ -40,7 +40,9 @@ export type WSServerMessage =
   | WSToolProgressMessage
   | WSStatusMessage
   | WSErrorMessage
-  | WSAskUserQuestionMessage;
+  | WSAskUserQuestionMessage
+  | WSHistoryBatchStart
+  | WSHistoryBatchEnd;
 
 export interface WSInitMessage {
   event: "init";
@@ -51,8 +53,8 @@ export interface WSInitMessage {
   };
 }
 
-export interface WSPendingMessage {
-  event: "pending_message";
+export interface WSSessionMessage {
+  event: "session_message";
   data: {
     message: string;
   };
@@ -123,6 +125,16 @@ export interface WSAskUserQuestionMessage {
     requestId: string;
     questions: AskUserQuestionItem[];
   };
+}
+
+export interface WSHistoryBatchStart {
+  event: "history_batch_start";
+  data: { messageCount: number };
+}
+
+export interface WSHistoryBatchEnd {
+  event: "history_batch_end";
+  data: {};
 }
 
 // ── Global sync WebSocket: Server → Client ──
