@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createSession } from "../api";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { MessageList } from "./MessageList";
+import type { MessageListHandle } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { AskUserQuestion } from "./AskUserQuestion";
 import type { SelectedProject } from "../App";
@@ -24,6 +25,7 @@ export function ChatArea({
     useSessionSocket(selectedSessionId);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const messageListRef = useRef<MessageListHandle>(null);
 
   // Reset create state when switching away from new session
   useEffect(() => {
@@ -50,6 +52,17 @@ export function ChatArea({
       setCreating(false);
     }
   };
+
+  const handleSend = useCallback(
+    (text: string, _model?: string) => {
+      sendMessage(text);
+      // Scroll to bottom after user sends a message
+      requestAnimationFrame(() => {
+        messageListRef.current?.scrollToBottom();
+      });
+    },
+    [sendMessage]
+  );
 
   // New session: same layout as active chat, but empty messages + model selector
   if (showNewSession && selectedProject) {
@@ -85,14 +98,14 @@ export function ChatArea({
   return (
     <div className="chat-area">
       {error && <div className="chat-area-error">{error}</div>}
-      <MessageList messages={messages} isStreaming={isStreaming} cwd={selectedProject?.cwd} />
+      <MessageList ref={messageListRef} messages={messages} isStreaming={isStreaming} cwd={selectedProject?.cwd} />
       {pendingQuestion && (
         <AskUserQuestion
           pendingQuestion={pendingQuestion}
           onAnswer={answerQuestion}
         />
       )}
-      <ChatInput onSend={sendMessage} disabled={isStreaming || isLoadingHistory} />
+      <ChatInput onSend={handleSend} disabled={isStreaming || isLoadingHistory} />
     </div>
   );
 }

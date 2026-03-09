@@ -46,4 +46,5 @@ export type {
   WSHistoryBatchEnd,
   WSSyncMessage,
   WSSessionStateChange,
+  WSSessionCreated,
 } from "./types/ws.js";

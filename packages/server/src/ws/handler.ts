@@ -22,6 +22,16 @@ export function attachWebSocket(server: Server, sessionManager: SessionManager):
     }
   });
 
+  // Listen for new session creation and broadcast to all sync clients
+  sessionManager.on("session_created", (payload: { sessionId: string; cwd: string }) => {
+    const message = JSON.stringify({ event: "session_created", data: payload });
+    for (const ws of syncClients) {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(message);
+      }
+    }
+  });
+
   server.on("upgrade", (req: IncomingMessage, socket, head) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 

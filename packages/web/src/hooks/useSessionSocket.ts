@@ -44,6 +44,9 @@ export function useSessionSocket(
   const isLoadingHistoryRef = useRef(false);
 
   useEffect(() => {
+    // Reset pending question whenever session changes
+    setPendingQuestion(null);
+
     if (!sessionId) {
       wsRef.current?.close();
       wsRef.current = null;

@@ -73,6 +73,17 @@ export class SessionManager extends EventEmitter {
     return this.activeSessions.get(sessionId);
   }
 
+  /** Return all in-memory active sessions whose cwd matches. */
+  getActiveSessionsByCwd(cwd: string): ActiveSession[] {
+    const result: ActiveSession[] = [];
+    for (const session of this.activeSessions.values()) {
+      if (session.sessionId && session.cwd === cwd) {
+        result.push(session);
+      }
+    }
+    return result;
+  }
+
   async createSession(
     cwd: string,
     options: CreateSessionOptions
@@ -122,7 +133,7 @@ export class SessionManager extends EventEmitter {
     // Push the first user message immediately
     session.messageQueue.push(options.message);
 
-    // Cache the first user message as pending (not yet persisted)
+    // Cache the first user message (not yet persisted)
     session.messageCache.push({ event: "session_message", data: { message: options.message } });
 
     // Start consuming messages in the background (handles init + ongoing)
@@ -147,7 +158,7 @@ export class SessionManager extends EventEmitter {
       session.messageQueue.push(message);
     }
 
-    // Cache and broadcast the user message as pending (not yet persisted by SDK).
+    // Cache and broadcast the user message (not yet persisted by SDK).
     const pending = { event: "session_message", data: { message } };
     session.messageCache.push(pending);
     this.broadcast(session, pending.event, pending.data);
@@ -454,6 +465,7 @@ export class SessionManager extends EventEmitter {
             session.sessionId = message.session_id;
             this.activeSessions.set(session.sessionId, session);
             this.emit("session_state", { sessionId: session.sessionId, state: "active" as SessionState });
+            this.emit("session_created", { sessionId: session.sessionId, cwd: session.cwd });
           }
           session.resolveSessionId(message.session_id);
         }
