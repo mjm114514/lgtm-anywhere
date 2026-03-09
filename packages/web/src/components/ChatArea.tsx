@@ -122,15 +122,6 @@ export function ChatArea({
         message: text,
         model: model || undefined,
       });
-      // Seed the user message so it appears immediately when the session view loads
-      setMessages([
-        {
-          id: `user-${Date.now()}`,
-          role: "user",
-          content: text,
-          blocks: [{ type: "text", text }],
-        },
-      ]);
       justCreatedRef.current.add(res.sessionId);
       onSessionCreated(res.sessionId);
     } catch (err) {

@@ -26,6 +26,8 @@ export interface ActiveSession {
     input: Record<string, unknown>;
     resolve: (answers: Record<string, string>) => void;
   }>;
+  /** Cache of WS messages sent since the last assistant message (for reconnect replay) */
+  messageCache: Array<{ event: string; data: unknown }>;
 }
 
 export interface CreateSessionOptions {
@@ -94,6 +96,7 @@ export class SessionManager extends EventEmitter {
       sessionIdReady,
       resolveSessionId,
       pendingQuestions: new Map(),
+      messageCache: [],
     };
 
     console.log("start query")
@@ -119,6 +122,9 @@ export class SessionManager extends EventEmitter {
     // Push the first user message immediately
     session.messageQueue.push(options.message);
 
+    // Cache the first user message as pending (not yet persisted)
+    session.messageCache.push({ event: "pending_message", data: { message: options.message } });
+
     // Start consuming messages in the background (handles init + ongoing)
     this.runSession(session, q);
 
@@ -140,6 +146,11 @@ export class SessionManager extends EventEmitter {
       // Session already active/idle — transport is ready, safe to push
       session.messageQueue.push(message);
     }
+
+    // Cache and broadcast the user message as pending (not yet persisted by SDK).
+    const pending = { event: "pending_message", data: { message } };
+    session.messageCache.push(pending);
+    this.broadcast(session, pending.event, pending.data);
 
     session.state = "active";
     session.lastActivityAt = Date.now();
@@ -173,6 +184,7 @@ export class SessionManager extends EventEmitter {
       sessionIdReady,
       resolveSessionId,
       pendingQuestions: new Map(),
+      messageCache: [],
     };
 
     const q = query({
@@ -196,6 +208,9 @@ export class SessionManager extends EventEmitter {
     // Push the first message immediately
     session.messageQueue.push(firstMessage);
 
+    // Cache the first user message as pending (not yet persisted)
+    session.messageCache.push({ event: "pending_message", data: { message: firstMessage } });
+
     // Start consuming in the background (init will be handled inline)
     this.runSession(session, q);
 
@@ -205,6 +220,10 @@ export class SessionManager extends EventEmitter {
   subscribeWS(sessionId: string, ws: WebSocket): void {
     const session = this.activeSessions.get(sessionId);
     if (session) {
+      // Replay cached streaming messages to the new client before subscribing
+      for (const cached of session.messageCache) {
+        this.sendWS(ws, cached.event, cached.data);
+      }
       session.wsClients.add(ws);
     }
   }
@@ -403,11 +422,23 @@ export class SessionManager extends EventEmitter {
 
         const mapped = this.mapMessageToEvent(message);
         if (mapped) {
+          // Cache management for reconnect replay:
+          // - "assistant" means the preceding stream_events are now persisted → clear cache
+          // - Then cache everything that's part of the in-flight turn
+          // - "result" means the entire turn is persisted → clear cache
+          if (message.type === "assistant") {
+            session.messageCache = [];
+          }
+
+          // Cache all broadcastable events (they'll be cleared on next assistant or result)
+          session.messageCache.push(mapped);
+
           this.broadcast(session, mapped.event, mapped.data);
         }
 
         // result means this turn is done → IDLE
         if (message.type === "result") {
+          session.messageCache = [];
           session.state = "idle";
           session.lastActivityAt = Date.now();
           this.emit("session_state", { sessionId: session.sessionId, state: "idle" as SessionState });

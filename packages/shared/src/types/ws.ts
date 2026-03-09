@@ -32,6 +32,7 @@ export interface AskUserQuestionItem {
 
 export type WSServerMessage =
   | WSInitMessage
+  | WSPendingMessage
   | WSAssistantMessage
   | WSStreamEventMessage
   | WSToolResultMessage
@@ -47,6 +48,13 @@ export interface WSInitMessage {
     sessionId: string;
     cwd: string;
     model: string;
+  };
+}
+
+export interface WSPendingMessage {
+  event: "pending_message";
+  data: {
+    message: string;
   };
 }
 
