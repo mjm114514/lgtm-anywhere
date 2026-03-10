@@ -530,10 +530,7 @@ export class SessionManager extends EventEmitter {
    * Called when a finalized message arrives that supersedes transient events
    * (e.g., stream_event deltas are superseded by the complete assistant message).
    */
-  private pruneSdkMessages(
-    cache: WSServerMessage[],
-    kind: string,
-  ): void {
+  private pruneSdkMessages(cache: WSServerMessage[], kind: string): void {
     for (let i = cache.length - 2; i >= 0; i--) {
       if (sdkMessageKind(cache[i]) === kind) {
         cache.splice(i, 1);
@@ -625,15 +622,13 @@ export class SessionManager extends EventEmitter {
             message.subtype === "task_notification"
           ) {
             const taskId = (message as { task_id: string }).task_id;
-            this.pruneSdkMessagesByPredicate(
-              session.messageCache,
-              (entry) => {
-                if (sdkMessageKind(entry) !== "task_progress") return false;
-                return (
-                  (entry as WSSdkMessage).message as { task_id: string }
-                ).task_id === taskId;
-              },
-            );
+            this.pruneSdkMessagesByPredicate(session.messageCache, (entry) => {
+              if (sdkMessageKind(entry) !== "task_progress") return false;
+              return (
+                ((entry as WSSdkMessage).message as { task_id: string })
+                  .task_id === taskId
+              );
+            });
           }
 
           this.broadcast(session, wrapped);

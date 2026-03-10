@@ -354,13 +354,18 @@ export function useSessionSocket(
           } else if (subtype === "task_progress") {
             const msg = sdk as unknown as {
               tool_use_id: string;
-              usage: { total_tokens: number; tool_uses: number; duration_ms: number };
+              usage: {
+                total_tokens: number;
+                tool_uses: number;
+                duration_ms: number;
+              };
               last_tool_name?: string;
             };
             const subagent = subagentMapRef.current.get(msg.tool_use_id);
             if (subagent) {
               subagent.usage = msg.usage;
-              if (msg.last_tool_name) subagent.lastToolName = msg.last_tool_name;
+              if (msg.last_tool_name)
+                subagent.lastToolName = msg.last_tool_name;
               updateSubagentInMessages(msg.tool_use_id);
             }
           } else if (subtype === "task_notification") {
@@ -368,7 +373,11 @@ export function useSessionSocket(
               tool_use_id: string;
               status: "completed" | "failed" | "stopped";
               summary: string;
-              usage?: { total_tokens: number; tool_uses: number; duration_ms: number };
+              usage?: {
+                total_tokens: number;
+                tool_uses: number;
+                duration_ms: number;
+              };
             };
             const subagent = subagentMapRef.current.get(msg.tool_use_id);
             if (subagent) {
@@ -394,63 +403,60 @@ export function useSessionSocket(
 
   // ── Control message handler ──
 
-  const handleControlMessage = useCallback(
-    (ctrl: ControlPayload) => {
-      switch (ctrl.type) {
-        case "session_message": {
-          const text = ctrl.message;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-              role: "user",
-              content: text,
-              blocks: [{ type: "text", text }],
-            },
-          ]);
-          if (!isLoadingHistoryRef.current) {
-            setIsStreaming(true);
-          }
-          break;
+  const handleControlMessage = useCallback((ctrl: ControlPayload) => {
+    switch (ctrl.type) {
+      case "session_message": {
+        const text = ctrl.message;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            role: "user",
+            content: text,
+            blocks: [{ type: "text", text }],
+          },
+        ]);
+        if (!isLoadingHistoryRef.current) {
+          setIsStreaming(true);
         }
-
-        case "ask_user_question": {
-          setPendingQuestion({
-            requestId: ctrl.requestId,
-            questions: ctrl.questions,
-          });
-          break;
-        }
-
-        case "error": {
-          setError(ctrl.error);
-          setIsStreaming(false);
-          streamBufRef.current = null;
-          break;
-        }
-
-        case "history_batch_start": {
-          isLoadingHistoryRef.current = true;
-          setIsLoadingHistory(true);
-          setMessages([]);
-          subagentMapRef.current = new Map();
-          break;
-        }
-
-        case "history_batch_end": {
-          isLoadingHistoryRef.current = false;
-          setIsLoadingHistory(false);
-          break;
-        }
-
-        case "todo_update": {
-          setTodos(ctrl.todos);
-          break;
-        }
+        break;
       }
-    },
-    [],
-  );
+
+      case "ask_user_question": {
+        setPendingQuestion({
+          requestId: ctrl.requestId,
+          questions: ctrl.questions,
+        });
+        break;
+      }
+
+      case "error": {
+        setError(ctrl.error);
+        setIsStreaming(false);
+        streamBufRef.current = null;
+        break;
+      }
+
+      case "history_batch_start": {
+        isLoadingHistoryRef.current = true;
+        setIsLoadingHistory(true);
+        setMessages([]);
+        subagentMapRef.current = new Map();
+        break;
+      }
+
+      case "history_batch_end": {
+        isLoadingHistoryRef.current = false;
+        setIsLoadingHistory(false);
+        break;
+      }
+
+      case "todo_update": {
+        setTodos(ctrl.todos);
+        break;
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!sessionId) {
