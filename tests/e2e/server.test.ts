@@ -97,8 +97,10 @@ describe("E2E: REST + WebSocket", () => {
     );
 
     try {
+      // SDK result message arrives as { category: "sdk", message: { type: "result", ... } }
       const result = await ws.waitForResult();
-      expect(result.event).toBe("result");
+      expect(result.category).toBe("sdk");
+      expect(result.message.type).toBe("result");
     } finally {
       ws.close();
     }
@@ -117,7 +119,8 @@ describe("E2E: REST + WebSocket", () => {
     try {
       ws.sendMessage("Now say goodbye. Do not use any tools.");
       const result = await ws.waitForResult();
-      expect(result.event).toBe("result");
+      expect(result.category).toBe("sdk");
+      expect(result.message.type).toBe("result");
     } finally {
       ws.close();
     }
