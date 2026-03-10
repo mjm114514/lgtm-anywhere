@@ -5,11 +5,31 @@ import type {
   TodoItem,
 } from "@lgtm-anywhere/shared";
 
+// ── Subagent state ──
+
+export interface SubagentState {
+  taskId: string;
+  toolUseId: string;
+  description: string;
+  prompt?: string;
+  status: "running" | "completed" | "failed" | "stopped";
+  summary?: string;
+  result?: string;
+  lastToolName?: string;
+  usage?: {
+    total_tokens: number;
+    tool_uses: number;
+    duration_ms: number;
+  };
+  innerBlocks: ContentBlock[];
+}
+
 // A single content block in an assistant turn
 export type ContentBlock =
   | { type: "text"; text: string }
   | { type: "tool_use"; toolUseId: string; name: string; input?: unknown }
-  | { type: "tool_result"; toolUseId: string; content: string };
+  | { type: "tool_result"; toolUseId: string; content: string }
+  | { type: "subagent"; toolUseId: string; task: SubagentState };
 
 export interface ChatMessage {
   id: string;
@@ -50,6 +70,9 @@ export function useSessionSocket(
   const streamBufRef = useRef<{ id: string; text: string } | null>(null);
   const isLoadingHistoryRef = useRef(false);
 
+  // Subagent tracking: maps toolUseId → SubagentState
+  const subagentMapRef = useRef<Map<string, SubagentState>>(new Map());
+
   // Reset state when sessionId changes (render-phase reset to avoid cascading renders)
   const [prevSessionId, setPrevSessionId] = useState(sessionId);
   if (prevSessionId !== sessionId) {
@@ -59,7 +82,68 @@ export function useSessionSocket(
     setMessages([]);
     setIsStreaming(false);
     setError(null);
+    subagentMapRef.current = new Map();
   }
+
+  /**
+   * Trigger a React re-render for a specific subagent by creating a new
+   * message reference for the message containing it.
+   */
+  const updateSubagentInMessages = useCallback(
+    (toolUseId: string) => {
+      setMessages((prev) => {
+        const subagent = subagentMapRef.current.get(toolUseId);
+        if (!subagent) return prev;
+
+        for (let i = prev.length - 1; i >= 0; i--) {
+          const m = prev[i];
+          if (m.role !== "assistant") continue;
+          const blockIdx = m.blocks.findIndex(
+            (b) => b.type === "subagent" && b.toolUseId === toolUseId,
+          );
+          if (blockIdx >= 0) {
+            const next = [...prev];
+            const newBlocks = [...m.blocks];
+            newBlocks[blockIdx] = {
+              type: "subagent",
+              toolUseId,
+              task: { ...subagent },
+            };
+            next[i] = { ...m, blocks: newBlocks };
+            return next;
+          }
+        }
+        return prev;
+      });
+    },
+    [],
+  );
+
+  /**
+   * Get or create a SubagentState for a given toolUseId.
+   */
+  const getOrCreateSubagent = useCallback(
+    (toolUseId: string, defaults?: Partial<SubagentState>): SubagentState => {
+      let state = subagentMapRef.current.get(toolUseId);
+      if (!state) {
+        state = {
+          taskId: defaults?.taskId ?? "",
+          toolUseId,
+          description: defaults?.description ?? "",
+          prompt: defaults?.prompt,
+          status: defaults?.status ?? "running",
+          summary: defaults?.summary,
+          result: defaults?.result,
+          lastToolName: defaults?.lastToolName,
+          usage: defaults?.usage,
+          innerBlocks: defaults?.innerBlocks ?? [],
+        };
+        subagentMapRef.current.set(toolUseId, state);
+      }
+      return state;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!sessionId) {
@@ -84,13 +168,59 @@ export function useSessionSocket(
 
       switch (msg.event) {
         case "assistant": {
+          const parentToolUseId = msg.data.parent_tool_use_id;
+
+          if (parentToolUseId) {
+            // Inner subagent message — fold into subagent's innerBlocks
+            const subagent = subagentMapRef.current.get(parentToolUseId);
+            if (subagent) {
+              const innerContentBlocks = extractBlocks(msg.data.message);
+              subagent.innerBlocks.push(...innerContentBlocks);
+              updateSubagentInMessages(parentToolUseId);
+            }
+            break;
+          }
+
+          // Top-level assistant message
           const blocks = extractBlocks(msg.data.message);
+
+          // Detect Agent tool_use blocks and create subagent entries
+          const finalBlocks: ContentBlock[] = [];
+          for (const block of blocks) {
+            if (block.type === "tool_use" && block.name === "Agent") {
+              const input = block.input as Record<string, unknown> | undefined;
+              const description =
+                typeof input?.description === "string"
+                  ? input.description
+                  : "Subagent";
+              const prompt =
+                typeof input?.prompt === "string" ? input.prompt : undefined;
+
+              const subagent = getOrCreateSubagent(block.toolUseId, {
+                description,
+                prompt,
+              });
+              // Update description/prompt if not yet set (race with task_started)
+              if (!subagent.description) subagent.description = description;
+              if (!subagent.prompt && prompt) subagent.prompt = prompt;
+
+              finalBlocks.push({
+                type: "subagent",
+                toolUseId: block.toolUseId,
+                task: { ...subagent },
+              });
+            } else {
+              finalBlocks.push(block);
+            }
+          }
+
           const text = blocks
             .filter(
               (b): b is ContentBlock & { type: "text" } => b.type === "text",
             )
             .map((b) => b.text)
             .join("");
+
           // Finalized assistant message — replace any streaming placeholder
           setMessages((prev) => {
             const filtered = prev.filter((m) => !m.isStreaming);
@@ -100,7 +230,7 @@ export function useSessionSocket(
                 id: msg.data.uuid,
                 role: "assistant",
                 content: text,
-                blocks,
+                blocks: finalBlocks,
               },
             ];
           });
@@ -109,6 +239,11 @@ export function useSessionSocket(
         }
 
         case "stream_event": {
+          const parentToolUseId = msg.data.parent_tool_use_id;
+
+          // Skip subagent streaming text — don't show in main view
+          if (parentToolUseId) break;
+
           const sEvent = msg.data.event as Record<string, unknown>;
           if (sEvent.type === "content_block_delta") {
             const delta = sEvent.delta as Record<string, unknown> | undefined;
@@ -145,9 +280,40 @@ export function useSessionSocket(
         }
 
         case "tool_result": {
+          const parentToolUseId = msg.data.parent_tool_use_id;
+
+          if (parentToolUseId) {
+            // Inner subagent tool result — fold into subagent's innerBlocks
+            const subagent = subagentMapRef.current.get(parentToolUseId);
+            if (subagent) {
+              const toolResult = extractToolResultBlock(msg.data.message);
+              if (toolResult) {
+                subagent.innerBlocks.push(toolResult);
+                updateSubagentInMessages(parentToolUseId);
+              }
+            }
+            break;
+          }
+
+          // Top-level tool result
           const toolResult = extractToolResultBlock(msg.data.message);
           if (toolResult) {
-            // Attach tool_result to the last assistant message's matching tool_use
+            // Check if this tool_result is for an Agent tool_use (subagent completion fallback)
+            const subagent = subagentMapRef.current.get(toolResult.toolUseId);
+            if (subagent && subagent.status === "running") {
+              // Update subagent status — the Agent tool returned
+              subagent.status = "completed";
+              subagent.result = toolResult.content || undefined;
+              if (!subagent.summary) {
+                subagent.summary = toolResult.content
+                  ? truncateString(toolResult.content, 500)
+                  : "Completed";
+              }
+              updateSubagentInMessages(toolResult.toolUseId);
+              break;
+            }
+
+            // Normal tool_result — attach to the last assistant message's matching tool_use
             setMessages((prev) => {
               const next = [...prev];
               // Walk backwards to find the assistant message containing this tool_use
@@ -179,6 +345,43 @@ export function useSessionSocket(
                 },
               ];
             });
+          }
+          break;
+        }
+
+        case "task_started": {
+          const { task_id, tool_use_id, description, prompt } = msg.data;
+          const subagent = getOrCreateSubagent(tool_use_id, {
+            taskId: task_id,
+            description,
+            prompt,
+          });
+          subagent.taskId = task_id;
+          if (description) subagent.description = description;
+          if (prompt) subagent.prompt = prompt;
+          updateSubagentInMessages(tool_use_id);
+          break;
+        }
+
+        case "task_progress": {
+          const { tool_use_id, usage, last_tool_name } = msg.data;
+          const subagent = subagentMapRef.current.get(tool_use_id);
+          if (subagent) {
+            subagent.usage = usage;
+            if (last_tool_name) subagent.lastToolName = last_tool_name;
+            updateSubagentInMessages(tool_use_id);
+          }
+          break;
+        }
+
+        case "task_notification": {
+          const { tool_use_id, status, summary, usage } = msg.data;
+          const subagent = subagentMapRef.current.get(tool_use_id);
+          if (subagent) {
+            subagent.status = status;
+            subagent.summary = summary;
+            if (usage) subagent.usage = usage;
+            updateSubagentInMessages(tool_use_id);
           }
           break;
         }
@@ -226,6 +429,7 @@ export function useSessionSocket(
           isLoadingHistoryRef.current = true;
           setIsLoadingHistory(true);
           setMessages([]);
+          subagentMapRef.current = new Map();
           break;
         }
 
@@ -254,7 +458,7 @@ export function useSessionSocket(
       ws.close();
       wsRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, getOrCreateSubagent, updateSubagentInMessages]);
 
   const sendMessage = useCallback((text: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -356,4 +560,8 @@ function extractToolResultBlock(
     toolUseId: block.tool_use_id as string,
     content,
   };
+}
+
+function truncateString(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + "..." : s;
 }

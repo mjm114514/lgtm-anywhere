@@ -1,7 +1,11 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage, ContentBlock } from "../hooks/useSessionSocket";
+import type {
+  ChatMessage,
+  ContentBlock,
+  SubagentState,
+} from "../hooks/useSessionSocket";
 import "./MessageBubble.css";
 
 interface MessageBubbleProps {
@@ -52,11 +56,20 @@ type TimelineEntry =
       toolUseId: string;
       input?: unknown;
       result?: string;
-    };
+    }
+  | { type: "subagent"; toolUseId: string; task: SubagentState; result?: string };
 
 function buildTimelineItems(blocks: ContentBlock[]): TimelineEntry[] {
   const items: TimelineEntry[] = [];
   const resultMap = new Map<string, string>();
+
+  // Collect tool_use IDs that are rendered as subagent blocks
+  const subagentToolUseIds = new Set<string>();
+  for (const b of blocks) {
+    if (b.type === "subagent") {
+      subagentToolUseIds.add(b.toolUseId);
+    }
+  }
 
   // First pass: collect all tool_results by toolUseId
   for (const b of blocks) {
@@ -74,12 +87,21 @@ function buildTimelineItems(blocks: ContentBlock[]): TimelineEntry[] {
     } else if (b.type === "tool_use") {
       // Skip TodoWrite — displayed in the dedicated TodoPanel instead
       if (b.name === "TodoWrite") continue;
+      // Skip Agent tool_use if already rendered as subagent block
+      if (b.name === "Agent" && subagentToolUseIds.has(b.toolUseId)) continue;
       items.push({
         type: "tool",
         name: b.name,
         toolUseId: b.toolUseId,
         input: b.input,
         result: resultMap.get(b.toolUseId),
+      });
+    } else if (b.type === "subagent") {
+      items.push({
+        type: "subagent",
+        toolUseId: b.toolUseId,
+        task: b.task,
+        result: b.task.result ?? resultMap.get(b.toolUseId),
       });
     }
     // tool_result blocks are consumed via resultMap, not rendered standalone
@@ -107,6 +129,10 @@ function TimelineItem({
         </div>
       </div>
     );
+  }
+
+  if (item.type === "subagent") {
+    return <SubagentBlock task={item.task} result={item.result} cwd={cwd} />;
   }
 
   return <ToolBlock item={item} cwd={cwd} />;
@@ -147,6 +173,92 @@ function ToolBlock({
           </div>
         )}
         {item.result && <ToolResult content={item.result} />}
+      </div>
+    </div>
+  );
+}
+
+// ── Subagent block ──
+
+function SubagentBlock({
+  task,
+  result,
+  cwd,
+}: {
+  task: SubagentState;
+  result?: string;
+  cwd?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const isRunning = task.status === "running";
+  const isFailed = task.status === "failed" || task.status === "stopped";
+
+  const toolCount = task.innerBlocks.filter(
+    (b) => b.type === "tool_use",
+  ).length;
+
+  const durationSec = task.usage
+    ? (task.usage.duration_ms / 1000).toFixed(1)
+    : null;
+
+  const tokenCount = task.usage ? task.usage.total_tokens : null;
+
+  // Build inner timeline items for expandable view
+  const innerItems = buildTimelineItems(task.innerBlocks);
+
+  return (
+    <div className="timeline-item">
+      <div className="timeline-dot timeline-dot--subagent" />
+      <div className="timeline-content">
+        <div
+          className="subagent-header"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <span className={`subagent-status-icon ${isFailed ? "subagent-status-icon--failed" : isRunning ? "subagent-status-icon--running" : "subagent-status-icon--done"}`} />
+          <span className="subagent-label">Agent</span>
+          <span className="subagent-description">{task.description}</span>
+          {isRunning && task.lastToolName && (
+            <span className="subagent-activity">
+              {task.lastToolName}
+            </span>
+          )}
+          <span
+            className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}
+          >
+            &#9656;
+          </span>
+        </div>
+
+        {/* Stats line */}
+        {(toolCount > 0 || durationSec || tokenCount) && (
+          <div className="subagent-stats">
+            {toolCount > 0 && (
+              <span>{toolCount} tool call{toolCount !== 1 ? "s" : ""}</span>
+            )}
+            {durationSec && <span>{durationSec}s</span>}
+            {tokenCount && (
+              <span>{tokenCount.toLocaleString()} tokens</span>
+            )}
+          </div>
+        )}
+
+        {/* Result — expandable like ToolResult */}
+        {result && <ToolResult content={result} />}
+
+        {/* Expandable inner timeline */}
+        {expanded && innerItems.length > 0 && (
+          <div className="subagent-inner">
+            {innerItems.map((innerItem, i) => (
+              <TimelineItem
+                key={i}
+                item={innerItem}
+                isStreaming={false}
+                cwd={cwd}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
