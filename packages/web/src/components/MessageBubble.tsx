@@ -57,7 +57,12 @@ type TimelineEntry =
       input?: unknown;
       result?: string;
     }
-  | { type: "subagent"; toolUseId: string; task: SubagentState; result?: string };
+  | {
+      type: "subagent";
+      toolUseId: string;
+      task: SubagentState;
+      result?: string;
+    };
 
 function buildTimelineItems(blocks: ContentBlock[]): TimelineEntry[] {
   const items: TimelineEntry[] = [];
@@ -211,17 +216,14 @@ function SubagentBlock({
     <div className="timeline-item">
       <div className="timeline-dot timeline-dot--subagent" />
       <div className="timeline-content">
-        <div
-          className="subagent-header"
-          onClick={() => setExpanded(!expanded)}
-        >
-          <span className={`subagent-status-icon ${isFailed ? "subagent-status-icon--failed" : isRunning ? "subagent-status-icon--running" : "subagent-status-icon--done"}`} />
+        <div className="subagent-header" onClick={() => setExpanded(!expanded)}>
+          <span
+            className={`subagent-status-icon ${isFailed ? "subagent-status-icon--failed" : isRunning ? "subagent-status-icon--running" : "subagent-status-icon--done"}`}
+          />
           <span className="subagent-label">Agent</span>
           <span className="subagent-description">{task.description}</span>
           {isRunning && task.lastToolName && (
-            <span className="subagent-activity">
-              {task.lastToolName}
-            </span>
+            <span className="subagent-activity">{task.lastToolName}</span>
           )}
           <span
             className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}
@@ -234,12 +236,12 @@ function SubagentBlock({
         {(toolCount > 0 || durationSec || tokenCount) && (
           <div className="subagent-stats">
             {toolCount > 0 && (
-              <span>{toolCount} tool call{toolCount !== 1 ? "s" : ""}</span>
+              <span>
+                {toolCount} tool call{toolCount !== 1 ? "s" : ""}
+              </span>
             )}
             {durationSec && <span>{durationSec}s</span>}
-            {tokenCount && (
-              <span>{tokenCount.toLocaleString()} tokens</span>
-            )}
+            {tokenCount && <span>{tokenCount.toLocaleString()} tokens</span>}
           </div>
         )}
 
