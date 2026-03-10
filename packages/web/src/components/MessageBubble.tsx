@@ -278,19 +278,14 @@ function ToolResult({ content }: { content: string }) {
   const display = expanded ? content : content.slice(0, 200);
 
   return (
-    <div className="tool-result">
+    <div
+      className={`tool-result ${truncated ? "tool-result--clickable" : ""}`}
+      onClick={() => truncated && setExpanded(!expanded)}
+    >
       <pre>
         {display}
         {truncated && !expanded && "..."}
       </pre>
-      {truncated && (
-        <button
-          className="tool-result-toggle"
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? "Show less" : "Show more"}
-        </button>
-      )}
     </div>
   );
 }
