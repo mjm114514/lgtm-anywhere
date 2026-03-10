@@ -2,7 +2,6 @@
 delete process.env.CLAUDECODE;
 
 import { createApp } from "./app.js";
-import { openBrowser } from "./open-browser.js";
 import { SessionManager } from "./services/session-manager.js";
 import { TerminalManager } from "./terminal/terminal-manager.js";
 import { attachWebSocket } from "./ws/handler.js";
@@ -10,7 +9,6 @@ import { config } from "./config.js";
 
 export interface ServerOptions {
   port?: number;
-  open?: boolean;
 }
 
 export async function startServer(options: ServerOptions = {}) {
@@ -25,9 +23,6 @@ export async function startServer(options: ServerOptions = {}) {
     console.log(
       `[lgtm-anywhere] WebSocket at ws://localhost:${port}/ws/sessions/:session_id`,
     );
-    if (options.open) {
-      openBrowser(url);
-    }
   });
 
   // Attach WebSocket handler to the same HTTP server
