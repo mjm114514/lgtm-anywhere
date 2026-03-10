@@ -158,7 +158,9 @@ function ToolBlock({
 
   return (
     <div className="timeline-item">
-      <div className={`timeline-dot ${inProgress ? "timeline-dot--tool-running" : "timeline-dot--tool"}`} />
+      <div
+        className={`timeline-dot ${inProgress ? "timeline-dot--tool-running" : "timeline-dot--tool"}`}
+      />
       <div className="timeline-content">
         <div className="tool-header" onClick={() => setExpanded(!expanded)}>
           <span className="tool-name">{item.name}</span>
