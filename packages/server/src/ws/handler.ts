@@ -3,6 +3,9 @@ import type { IncomingMessage } from "node:http";
 import type { Server } from "node:http";
 import type {
   WSClientMessage,
+  WSAnswerToolApproval,
+  WSSetPermissionMode,
+  PermissionMode,
   SessionState,
   WSServerMessage,
   ControlPayload,
@@ -180,6 +183,51 @@ async function handleConnection(
       );
       if (!resolved) {
         sendError(ws, "No pending question with that requestId", "NOT_FOUND");
+      }
+    } else if (msg.type === "answer_tool_approval") {
+      const approvalMsg = msg as WSAnswerToolApproval;
+      if (!approvalMsg.requestId || !approvalMsg.decision) {
+        sendError(ws, "requestId and decision are required", "INVALID_REQUEST");
+        return;
+      }
+      const resolved = sessionManager.resolveToolApproval(
+        sessionId,
+        approvalMsg.requestId,
+        approvalMsg.decision,
+        approvalMsg.denyMessage,
+      );
+      if (!resolved) {
+        sendError(
+          ws,
+          "No pending tool approval with that requestId",
+          "NOT_FOUND",
+        );
+      }
+    } else if (msg.type === "set_permission_mode") {
+      const modeMsg = msg as WSSetPermissionMode;
+      const validModes: PermissionMode[] = [
+        "default",
+        "acceptEdits",
+        "bypassPermissions",
+        "plan",
+        "dontAsk",
+      ];
+      if (!validModes.includes(modeMsg.mode)) {
+        sendError(
+          ws,
+          `Invalid permission mode: ${modeMsg.mode}`,
+          "INVALID_REQUEST",
+        );
+        return;
+      }
+      try {
+        await sessionManager.setPermissionMode(sessionId, modeMsg.mode);
+      } catch (err) {
+        sendError(
+          ws,
+          err instanceof Error ? err.message : "Failed to set permission mode",
+          "SET_MODE_ERROR",
+        );
       }
     } else {
       sendError(

@@ -27,9 +27,12 @@ export type {
 } from "./types/sse.js";
 export type { TodoItem } from "./types/todo.js";
 export type {
+  PermissionMode,
   WSClientMessage,
   WSMessageSend,
   WSAnswerQuestion,
+  WSAnswerToolApproval,
+  WSSetPermissionMode,
   AskUserQuestionOption,
   AskUserQuestionItem,
   WSSdkMessage,
@@ -38,6 +41,8 @@ export type {
   ControlPayload,
   ControlSessionMessage,
   ControlAskUserQuestion,
+  ControlToolApprovalRequest,
+  ControlPermissionModeChanged,
   ControlError,
   ControlHistoryBatchStart,
   ControlHistoryBatchEnd,

@@ -1,0 +1,265 @@
+.tool-approval {
+  width: 100%;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  padding: 12px 16px;
+}
+
+/* Mirror the timeline-item layout from MessageBubble */
+.tool-approval-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Pulsing amber dot — signals "waiting for you" */
+.tool-approval-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: approval-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes approval-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.tool-approval-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Tool name + first param summary — same style as .tool-header */
+.tool-approval-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.tool-approval-name {
+  font-weight: 700;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  color: #1a1a1a;
+  flex-shrink: 0;
+}
+
+.tool-approval-summary {
+  color: #666;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-approval-reason {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.4;
+}
+
+/* Additional params — same monospace style, muted */
+.tool-approval-params {
+  padding: 6px 10px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 100px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.tool-approval-param {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-approval-param-key {
+  color: #888;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+}
+
+.tool-approval-param-val {
+  color: #444;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+}
+
+/* Action buttons — compact, aligned right */
+.tool-approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tool-approval-btn {
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.tool-approval-btn--allow {
+  color: #fff;
+  background: #1976d2;
+  border: 1px solid #1976d2;
+}
+
+.tool-approval-btn--allow:hover {
+  background: #1565c0;
+  border-color: #1565c0;
+}
+
+.tool-approval-btn--deny {
+  color: #666;
+  background: #fff;
+  border: 1px solid #d0d0d0;
+}
+
+.tool-approval-btn--deny:hover {
+  color: #c62828;
+  border-color: #c62828;
+  background: #fff5f5;
+}
+
+/* ── ExitPlanMode — AskUserQuestion-style card layout ── */
+
+.tool-approval--exit-plan {
+  border-radius: 12px 12px 0 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  container-type: inline-size;
+}
+
+.tool-approval-ep-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1565c0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Option cards — vertical stack, equal width */
+.tool-approval-ep-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tool-approval-ep-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.tool-approval-ep-option:hover {
+  border-color: #90caf9;
+  background: #f0f4f8;
+}
+
+.tool-approval-ep-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tool-approval-ep-option-full {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.tool-approval-ep-option-short {
+  display: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* Narrow container: show short label, hide full label */
+@container (max-width: 420px) {
+  .tool-approval-ep-option-full {
+    display: none;
+  }
+  .tool-approval-ep-option-short {
+    display: inline;
+  }
+}
+
+/* Reject input — mirrors .ask-question-custom */
+.tool-approval-ep-reject {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.tool-approval-ep-reject-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+  background: #f8f9fa;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.tool-approval-ep-reject-input:focus {
+  border-color: #1976d2;
+}
+
+.tool-approval-ep-reject-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #c62828;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.tool-approval-ep-reject-btn:hover {
+  background: #b71c1c;
+}

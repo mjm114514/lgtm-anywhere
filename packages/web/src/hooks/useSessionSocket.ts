@@ -4,6 +4,7 @@ import type {
   ControlPayload,
   AskUserQuestionItem,
   TodoItem,
+  PermissionMode,
 } from "@lgtm-anywhere/shared";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
@@ -46,27 +47,49 @@ export interface PendingQuestion {
   questions: AskUserQuestionItem[];
 }
 
+export interface PendingToolApproval {
+  requestId: string;
+  toolName: string;
+  toolUseId: string;
+  input: Record<string, unknown>;
+  decisionReason?: string;
+}
+
 interface UseSessionSocketReturn {
   messages: ChatMessage[];
   isStreaming: boolean;
   isLoadingHistory: boolean;
   error: string | null;
   pendingQuestion: PendingQuestion | null;
+  pendingToolApproval: PendingToolApproval | null;
+  permissionMode: PermissionMode;
   todos: TodoItem[];
   sendMessage: (text: string) => void;
   answerQuestion: (requestId: string, answers: Record<string, string>) => void;
+  answerToolApproval: (
+    requestId: string,
+    decision: "allow" | "deny",
+    denyMessage?: string,
+  ) => void;
+  setPermissionMode: (mode: PermissionMode) => void;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
 export function useSessionSocket(
   sessionId: string | null,
+  initialPermissionMode?: PermissionMode,
 ): UseSessionSocketReturn {
+  const effectiveInitialMode = initialPermissionMode ?? "bypassPermissions";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingQuestion, setPendingQuestion] =
     useState<PendingQuestion | null>(null);
+  const [pendingToolApproval, setPendingToolApproval] =
+    useState<PendingToolApproval | null>(null);
+  const [permissionMode, setPermissionModeState] =
+    useState<PermissionMode>(effectiveInitialMode);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const streamBufRef = useRef<{ id: string; text: string } | null>(null);
@@ -80,6 +103,8 @@ export function useSessionSocket(
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
     setPendingQuestion(null);
+    setPendingToolApproval(null);
+    setPermissionModeState(effectiveInitialMode);
     setTodos([]);
     setMessages([]);
     setIsStreaming(false);
@@ -335,7 +360,14 @@ export function useSessionSocket(
         case "system": {
           const subtype = "subtype" in sdk ? sdk.subtype : undefined;
 
-          if (subtype === "task_started") {
+          if (subtype === "init") {
+            const msg = sdk as unknown as {
+              permissionMode?: string;
+            };
+            if (msg.permissionMode) {
+              setPermissionModeState(msg.permissionMode as PermissionMode);
+            }
+          } else if (subtype === "task_started") {
             const msg = sdk as unknown as {
               task_id: string;
               tool_use_id: string;
@@ -386,6 +418,13 @@ export function useSessionSocket(
               if (msg.usage) subagent.usage = msg.usage;
               updateSubagentInMessages(msg.tool_use_id);
             }
+          } else if (subtype === "status") {
+            const msg = sdk as unknown as {
+              permissionMode?: string;
+            };
+            if (msg.permissionMode) {
+              setPermissionModeState(msg.permissionMode as PermissionMode);
+            }
           }
           break;
         }
@@ -394,6 +433,7 @@ export function useSessionSocket(
           setIsStreaming(false);
           streamBufRef.current = null;
           setPendingQuestion(null);
+          setPendingToolApproval(null);
           break;
         }
       }
@@ -427,6 +467,22 @@ export function useSessionSocket(
           requestId: ctrl.requestId,
           questions: ctrl.questions,
         });
+        break;
+      }
+
+      case "tool_approval_request": {
+        setPendingToolApproval({
+          requestId: ctrl.requestId,
+          toolName: ctrl.toolName,
+          toolUseId: ctrl.toolUseId,
+          input: ctrl.input,
+          decisionReason: ctrl.decisionReason,
+        });
+        break;
+      }
+
+      case "permission_mode_changed": {
+        setPermissionModeState(ctrl.mode);
         break;
       }
 
@@ -517,15 +573,42 @@ export function useSessionSocket(
     [],
   );
 
+  const answerToolApproval = useCallback(
+    (requestId: string, decision: "allow" | "deny", denyMessage?: string) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+      wsRef.current.send(
+        JSON.stringify({
+          type: "answer_tool_approval",
+          requestId,
+          decision,
+          denyMessage,
+        }),
+      );
+      setPendingToolApproval(null);
+    },
+    [],
+  );
+
+  const setPermissionMode = useCallback((mode: PermissionMode) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ type: "set_permission_mode", mode }));
+    // Optimistic update
+    setPermissionModeState(mode);
+  }, []);
+
   return {
     messages,
     isStreaming,
     isLoadingHistory,
     error,
     pendingQuestion,
+    pendingToolApproval,
+    permissionMode,
     todos,
     sendMessage,
     answerQuestion,
+    answerToolApproval,
+    setPermissionMode,
     setMessages,
   };
 }

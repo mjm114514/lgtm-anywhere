@@ -14,12 +14,14 @@ export interface SendMessageRequest {
 export interface UpdateSessionRequest {
   title?: string;
   model?: string;
+  permissionMode?: string;
 }
 
 export interface UpdateSessionResponse {
   sessionId: string;
   title?: string;
   model?: string;
+  permissionMode?: string;
 }
 
 export interface CreateSessionResponse {

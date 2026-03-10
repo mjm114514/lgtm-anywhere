@@ -14,17 +14,20 @@ export default function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
+  const [selectedSessionSummary, setSelectedSessionSummary] = useState("");
   const [showNewSession, setShowNewSession] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleSelectProject = (project: SelectedProject) => {
     setSelectedProject(project);
     setSelectedSessionId(null);
+    setSelectedSessionSummary("");
     setShowNewSession(false);
   };
 
-  const handleSelectSession = (sessionId: string) => {
+  const handleSelectSession = (sessionId: string, summary: string) => {
     setSelectedSessionId(sessionId);
+    setSelectedSessionSummary(summary);
     setShowNewSession(false);
   };
 
@@ -52,6 +55,7 @@ export default function App() {
       <ChatArea
         selectedProject={selectedProject}
         selectedSessionId={selectedSessionId}
+        sessionSummary={selectedSessionSummary}
         showNewSession={showNewSession}
         onSessionCreated={handleSessionCreated}
       />
