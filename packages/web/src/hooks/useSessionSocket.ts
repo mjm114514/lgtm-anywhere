@@ -82,42 +82,43 @@ export function useSessionSocket(
     setMessages([]);
     setIsStreaming(false);
     setError(null);
-    subagentMapRef.current = new Map();
   }
+
+  // Reset ref outside of render to satisfy react-hooks/refs rule
+  useEffect(() => {
+    subagentMapRef.current = new Map();
+  }, [sessionId]);
 
   /**
    * Trigger a React re-render for a specific subagent by creating a new
    * message reference for the message containing it.
    */
-  const updateSubagentInMessages = useCallback(
-    (toolUseId: string) => {
-      setMessages((prev) => {
-        const subagent = subagentMapRef.current.get(toolUseId);
-        if (!subagent) return prev;
+  const updateSubagentInMessages = useCallback((toolUseId: string) => {
+    setMessages((prev) => {
+      const subagent = subagentMapRef.current.get(toolUseId);
+      if (!subagent) return prev;
 
-        for (let i = prev.length - 1; i >= 0; i--) {
-          const m = prev[i];
-          if (m.role !== "assistant") continue;
-          const blockIdx = m.blocks.findIndex(
-            (b) => b.type === "subagent" && b.toolUseId === toolUseId,
-          );
-          if (blockIdx >= 0) {
-            const next = [...prev];
-            const newBlocks = [...m.blocks];
-            newBlocks[blockIdx] = {
-              type: "subagent",
-              toolUseId,
-              task: { ...subagent },
-            };
-            next[i] = { ...m, blocks: newBlocks };
-            return next;
-          }
+      for (let i = prev.length - 1; i >= 0; i--) {
+        const m = prev[i];
+        if (m.role !== "assistant") continue;
+        const blockIdx = m.blocks.findIndex(
+          (b) => b.type === "subagent" && b.toolUseId === toolUseId,
+        );
+        if (blockIdx >= 0) {
+          const next = [...prev];
+          const newBlocks = [...m.blocks];
+          newBlocks[blockIdx] = {
+            type: "subagent",
+            toolUseId,
+            task: { ...subagent },
+          };
+          next[i] = { ...m, blocks: newBlocks };
+          return next;
         }
-        return prev;
-      });
-    },
-    [],
-  );
+      }
+      return prev;
+    });
+  }, []);
 
   /**
    * Get or create a SubagentState for a given toolUseId.
