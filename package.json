@@ -11,7 +11,7 @@
     "build": "npm run build -w packages/shared && npm run build -w packages/server && npm run build -w packages/web",
     "dev": "concurrently -n server,web -c blue,green \"npm run dev -w packages/server\" \"npm run dev -w packages/web\"",
     "start": "node packages/server/dist/cli.js --open",
-    "prepublish": "npm run build && cp -r packages/web/dist packages/server/public",
+    "prepublishOnly": "npm run build && cp -r packages/web/dist packages/server/public",
     "publish:all": "npm run prepublish && npm publish -w packages/shared && npm publish -w packages/server",
     "clean": "npm run clean -w packages/shared && npm run clean -w packages/server",
     "test": "vitest run",
