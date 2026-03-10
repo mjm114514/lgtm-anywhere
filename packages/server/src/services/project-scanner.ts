@@ -30,7 +30,12 @@ export async function scanProjects(): Promise<ProjectListItem[]> {
 
   const projects: ProjectListItem[] = [];
   for (const [cwd, info] of projectMap) {
-    projects.push({ cwd, ...info });
+    projects.push({
+      cwd,
+      ...info,
+      activeSessionCount: 0,
+      activeTerminalCount: 0,
+    });
   }
 
   // Sort by lastModified descending

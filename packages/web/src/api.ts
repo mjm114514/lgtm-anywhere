@@ -5,6 +5,8 @@ import type {
   CreateSessionRequest,
   CreateSessionResponse,
   DeleteSessionResponse,
+  TerminalInfo,
+  CreateTerminalResponse,
 } from "@lgtm-anywhere/shared";
 
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
@@ -50,6 +52,30 @@ export function deleteSession(
   sessionId: string,
 ): Promise<DeleteSessionResponse> {
   return fetchJSON<DeleteSessionResponse>(`/api/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+}
+
+// ── Terminal API ──
+
+export function createTerminal(cwd: string): Promise<CreateTerminalResponse> {
+  return fetchJSON<CreateTerminalResponse>("/api/terminals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cwd }),
+  });
+}
+
+export function fetchTerminals(cwd: string): Promise<TerminalInfo[]> {
+  return fetchJSON<TerminalInfo[]>(
+    `/api/terminals?cwd=${encodeURIComponent(cwd)}`,
+  );
+}
+
+export function deleteTerminal(
+  id: string,
+): Promise<{ id: string; killed: boolean }> {
+  return fetchJSON<{ id: string; killed: boolean }>(`/api/terminals/${id}`, {
     method: "DELETE",
   });
 }

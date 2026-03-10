@@ -11,6 +11,7 @@ import { ChatInput } from "./ChatInput";
 import { AskUserQuestion } from "./AskUserQuestion";
 import { ToolApproval } from "./ToolApproval";
 import { TodoPanel } from "./TodoPanel";
+import { TerminalPanel } from "./TerminalPanel";
 import type { SelectedProject } from "../App";
 import "./ChatArea.css";
 
@@ -190,21 +191,24 @@ export function ChatArea({
             onChange={setNewSessionPermMode}
           />
         </div>
-        {createError && <div className="chat-area-error">{createError}</div>}
-        <MessageList
-          messages={[]}
-          isStreaming={false}
-          cwd={selectedProject.cwd}
-        />
-        <ChatInput
-          onSend={handleNewSessionSend}
-          disabled={creating}
-          placeholder={
-            creating
-              ? "Creating session..."
-              : "What would you like Claude to help with?"
-          }
-        />
+        <div className="chat-area-main">
+          {createError && <div className="chat-area-error">{createError}</div>}
+          <MessageList
+            messages={[]}
+            isStreaming={false}
+            cwd={selectedProject.cwd}
+          />
+          <ChatInput
+            onSend={handleNewSessionSend}
+            disabled={creating}
+            placeholder={
+              creating
+                ? "Creating session..."
+                : "What would you like Claude to help with?"
+            }
+          />
+        </div>
+        <TerminalPanel cwd={selectedProject.cwd} />
       </div>
     );
   }
@@ -232,31 +236,34 @@ export function ChatArea({
           onChange={handlePermissionModeChange}
         />
       </div>
-      {error && <div className="chat-area-error">{error}</div>}
-      <MessageList
-        ref={messageListRef}
-        messages={messages}
-        isStreaming={isStreaming}
-        cwd={selectedProject?.cwd}
-      />
-      {pendingQuestion && (
-        <AskUserQuestion
-          pendingQuestion={pendingQuestion}
-          onAnswer={answerQuestion}
+      <div className="chat-area-main">
+        {error && <div className="chat-area-error">{error}</div>}
+        <MessageList
+          ref={messageListRef}
+          messages={messages}
+          isStreaming={isStreaming}
+          cwd={selectedProject?.cwd}
         />
-      )}
-      {pendingToolApproval && (
-        <ToolApproval
-          pendingToolApproval={pendingToolApproval}
-          onAnswer={answerToolApproval}
-          onSetPermissionMode={handlePermissionModeChange}
+        {pendingQuestion && (
+          <AskUserQuestion
+            pendingQuestion={pendingQuestion}
+            onAnswer={answerQuestion}
+          />
+        )}
+        {pendingToolApproval && (
+          <ToolApproval
+            pendingToolApproval={pendingToolApproval}
+            onAnswer={answerToolApproval}
+            onSetPermissionMode={handlePermissionModeChange}
+          />
+        )}
+        <ChatInput
+          onSend={handleSend}
+          disabled={isStreaming || isLoadingHistory}
         />
-      )}
-      <ChatInput
-        onSend={handleSend}
-        disabled={isStreaming || isLoadingHistory}
-      />
-      <TodoPanel todos={todos} />
+        <TodoPanel todos={todos} />
+      </div>
+      <TerminalPanel cwd={selectedProject?.cwd ?? null} />
     </div>
   );
 }

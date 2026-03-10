@@ -27,6 +27,13 @@ export type {
 } from "./types/sse.js";
 export type { TodoItem } from "./types/todo.js";
 export type {
+  WSTerminalClientMessage,
+  WSTerminalServerMessage,
+  TerminalInfo,
+  CreateTerminalRequest,
+  CreateTerminalResponse,
+} from "./types/terminal.js";
+export type {
   PermissionMode,
   WSClientMessage,
   WSMessageSend,
@@ -51,4 +58,6 @@ export type {
   WSSyncMessage,
   WSSessionStateChange,
   WSSessionCreated,
+  WSTerminalCreated,
+  WSTerminalClosed,
 } from "./types/ws.js";

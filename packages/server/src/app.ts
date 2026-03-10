@@ -1,9 +1,14 @@
 import express from "express";
-import projectRoutes from "./routes/projects.js";
+import { createProjectRoutes } from "./routes/projects.js";
 import { createSessionRoutes } from "./routes/sessions.js";
+import { createTerminalRoutes } from "./terminal/routes.js";
 import { SessionManager } from "./services/session-manager.js";
+import { TerminalManager } from "./terminal/terminal-manager.js";
 
-export function createApp(sessionManager: SessionManager) {
+export function createApp(
+  sessionManager: SessionManager,
+  terminalManager: TerminalManager,
+) {
   const app = express();
 
   app.use(express.json({ limit: "50mb" }));
@@ -24,8 +29,12 @@ export function createApp(sessionManager: SessionManager) {
   });
 
   // Routes
-  app.use("/api/projects", projectRoutes);
+  app.use(
+    "/api/projects",
+    createProjectRoutes(sessionManager, terminalManager),
+  );
   app.use("/api/sessions", createSessionRoutes(sessionManager));
+  app.use("/api/terminals", createTerminalRoutes(terminalManager));
 
   // Error handling middleware
   app.use(

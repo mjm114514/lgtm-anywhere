@@ -12,9 +12,12 @@ import type {
 } from "@lgtm-anywhere/shared";
 import { listSessions } from "@anthropic-ai/claude-agent-sdk";
 import { SessionManager } from "../services/session-manager.js";
+import { TerminalManager } from "../terminal/terminal-manager.js";
+import { handleTerminalConnection } from "../terminal/ws-handler.js";
 
 const WS_PATH_RE = /^\/ws\/sessions\/([^/]+)$/;
 const WS_SYNC_PATH_RE = /^\/ws\/sync$/;
+const WS_TERMINAL_RE = /^\/ws\/terminal\/([^/]+)$/;
 
 /** Build a control WSServerMessage. */
 function controlMsg(message: ControlPayload): WSServerMessage {
@@ -36,6 +39,7 @@ function sendWS(ws: WebSocket, msg: WSServerMessage): void {
 export function attachWebSocket(
   server: Server,
   sessionManager: SessionManager,
+  terminalManager: TerminalManager,
 ): void {
   const wss = new WebSocketServer({ noServer: true });
   const syncClients = new Set<WebSocket>();
@@ -69,6 +73,37 @@ export function attachWebSocket(
     },
   );
 
+  // Listen for terminal lifecycle events and broadcast to all sync clients
+  terminalManager.on(
+    "terminal_created",
+    (payload: { terminalId: string; cwd: string }) => {
+      const message = JSON.stringify({
+        event: "terminal_created",
+        data: payload,
+      });
+      for (const ws of syncClients) {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(message);
+        }
+      }
+    },
+  );
+
+  terminalManager.on(
+    "terminal_closed",
+    (payload: { terminalId: string; cwd: string }) => {
+      const message = JSON.stringify({
+        event: "terminal_closed",
+        data: payload,
+      });
+      for (const ws of syncClients) {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(message);
+        }
+      }
+    },
+  );
+
   server.on("upgrade", (req: IncomingMessage, socket, head) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 
@@ -82,7 +117,15 @@ export function attachWebSocket(
 
     if (WS_SYNC_PATH_RE.test(url.pathname)) {
       wss.handleUpgrade(req, socket, head, (ws) => {
-        handleSyncConnection(ws, syncClients, sessionManager);
+        handleSyncConnection(ws, syncClients, sessionManager, terminalManager);
+      });
+      return;
+    }
+
+    const termMatch = url.pathname.match(WS_TERMINAL_RE);
+    if (termMatch) {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        handleTerminalConnection(ws, termMatch[1], terminalManager);
       });
       return;
     }
@@ -252,12 +295,33 @@ function handleSyncConnection(
   ws: WebSocket,
   syncClients: Set<WebSocket>,
   sessionManager: SessionManager,
+  terminalManager: TerminalManager,
 ): void {
   syncClients.add(ws);
 
-  // Send current snapshot of all active/idle session states
+  // Send current snapshot of all active/idle session states (with cwd)
   for (const entry of sessionManager.getAllStates()) {
     ws.send(JSON.stringify({ event: "session_state", data: entry }));
+  }
+
+  // Send session_created for each active session so client learns sessionId→cwd
+  for (const session of sessionManager.getAllActiveSessions()) {
+    ws.send(
+      JSON.stringify({
+        event: "session_created",
+        data: { sessionId: session.sessionId, cwd: session.cwd },
+      }),
+    );
+  }
+
+  // Send terminal_created for each existing terminal so client seeds its map
+  for (const terminal of terminalManager.list()) {
+    ws.send(
+      JSON.stringify({
+        event: "terminal_created",
+        data: { terminalId: terminal.id, cwd: terminal.cwd },
+      }),
+    );
   }
 
   ws.on("close", () => {

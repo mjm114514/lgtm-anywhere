@@ -168,6 +168,14 @@ export class SessionManager extends EventEmitter {
     }));
   }
 
+  /** Return all in-memory active sessions (for sync snapshot). */
+  getAllActiveSessions(): Array<{ sessionId: string; cwd: string }> {
+    return Array.from(this.activeSessions.values()).map((s) => ({
+      sessionId: s.sessionId,
+      cwd: s.cwd,
+    }));
+  }
+
   getActiveSession(sessionId: string): ActiveSession | undefined {
     return this.activeSessions.get(sessionId);
   }

@@ -3,11 +3,13 @@ delete process.env.CLAUDECODE;
 
 import { createApp } from "./app.js";
 import { SessionManager } from "./services/session-manager.js";
+import { TerminalManager } from "./terminal/terminal-manager.js";
 import { attachWebSocket } from "./ws/handler.js";
 import { config } from "./config.js";
 
 const sessionManager = new SessionManager();
-const app = createApp(sessionManager);
+const terminalManager = new TerminalManager();
+const app = createApp(sessionManager, terminalManager);
 
 const server = app.listen(config.port, () => {
   console.log(
@@ -19,11 +21,12 @@ const server = app.listen(config.port, () => {
 });
 
 // Attach WebSocket handler to the same HTTP server
-attachWebSocket(server, sessionManager);
+attachWebSocket(server, sessionManager, terminalManager);
 
 // Graceful shutdown
 async function shutdown(signal: string) {
   console.log(`\n[${signal}] Shutting down gracefully...`);
+  terminalManager.shutdown();
   await sessionManager.shutdown();
   server.close(() => {
     console.log("[shutdown] Server closed");
