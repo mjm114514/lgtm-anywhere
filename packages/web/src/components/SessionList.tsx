@@ -9,7 +9,7 @@ interface SessionListProps {
   cwd: string;
   projectName: string;
   selectedSessionId: string | null;
-  onSelect: (sessionId: string) => void;
+  onSelect: (sessionId: string, summary: string) => void;
   onNewSession: () => void;
 }
 
@@ -90,7 +90,9 @@ export function SessionList({
           <button
             key={s.sessionId}
             className={`session-list-item ${isSelected ? "session-list-item--selected" : ""}`}
-            onClick={() => onSelect(s.sessionId)}
+            onClick={() =>
+              onSelect(s.sessionId, s.summary || s.sessionId.slice(0, 8))
+            }
           >
             <div className="session-list-item-top">
               <span

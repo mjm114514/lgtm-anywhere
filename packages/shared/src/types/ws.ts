@@ -1,8 +1,21 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
+// ── Permission mode ──
+
+export type PermissionMode =
+  | "default"
+  | "acceptEdits"
+  | "bypassPermissions"
+  | "plan"
+  | "dontAsk";
+
 // ── Client → Server ──
 
-export type WSClientMessage = WSMessageSend | WSAnswerQuestion;
+export type WSClientMessage =
+  | WSMessageSend
+  | WSAnswerQuestion
+  | WSAnswerToolApproval
+  | WSSetPermissionMode;
 
 export interface WSMessageSend {
   type: "message";
@@ -13,6 +26,18 @@ export interface WSAnswerQuestion {
   type: "answer_question";
   requestId: string;
   answers: Record<string, string>;
+}
+
+export interface WSAnswerToolApproval {
+  type: "answer_tool_approval";
+  requestId: string;
+  decision: "allow" | "deny";
+  denyMessage?: string;
+}
+
+export interface WSSetPermissionMode {
+  type: "set_permission_mode";
+  mode: PermissionMode;
 }
 
 // ── AskUserQuestion types ──
@@ -52,6 +77,8 @@ export type WSServerMessage = WSSdkMessage | WSControlMessage;
 export type ControlPayload =
   | ControlSessionMessage
   | ControlAskUserQuestion
+  | ControlToolApprovalRequest
+  | ControlPermissionModeChanged
   | ControlError
   | ControlHistoryBatchStart
   | ControlHistoryBatchEnd
@@ -66,6 +93,20 @@ export interface ControlAskUserQuestion {
   type: "ask_user_question";
   requestId: string;
   questions: AskUserQuestionItem[];
+}
+
+export interface ControlToolApprovalRequest {
+  type: "tool_approval_request";
+  requestId: string;
+  toolName: string;
+  toolUseId: string;
+  input: Record<string, unknown>;
+  decisionReason?: string;
+}
+
+export interface ControlPermissionModeChanged {
+  type: "permission_mode_changed";
+  mode: PermissionMode;
 }
 
 export interface ControlError {

@@ -104,6 +104,17 @@ export interface ActiveSession {
       resolve: (answers: Record<string, string>) => void;
     }
   >;
+  /** Pending tool approval requests awaiting user decision */
+  pendingToolApprovals: Map<
+    string,
+    {
+      toolName: string;
+      input: Record<string, unknown>;
+      resolve: (decision: { allow: boolean; denyMessage?: string }) => void;
+    }
+  >;
+  /** Current permission mode for this session */
+  permissionMode: PermissionMode;
   /** Full cache of WS messages (history + runtime) for the session lifetime */
   messageCache: WSServerMessage[];
   /** Current todo list maintained via TodoWrite tool interceptions */
@@ -179,6 +190,9 @@ export class SessionManager extends EventEmitter {
 
     const { sessionIdReady, resolveSessionId } = makeSessionIdHook();
 
+    const permMode: PermissionMode =
+      (options.permissionMode as PermissionMode) ?? "bypassPermissions";
+
     const session: ActiveSession = {
       sessionId: "", // will be set from init message
       cwd,
@@ -193,6 +207,8 @@ export class SessionManager extends EventEmitter {
       sessionIdReady,
       resolveSessionId,
       pendingQuestions: new Map(),
+      pendingToolApprovals: new Map(),
+      permissionMode: permMode,
       messageCache: [],
       currentTodos: [],
     };
@@ -203,8 +219,7 @@ export class SessionManager extends EventEmitter {
       options: {
         cwd,
         model: options.model,
-        permissionMode:
-          (options.permissionMode as PermissionMode) ?? "bypassPermissions",
+        permissionMode: permMode as PermissionMode,
         allowDangerouslySkipPermissions: true,
         allowedTools: options.allowedTools,
         systemPrompt: options.systemPrompt,
@@ -288,6 +303,8 @@ export class SessionManager extends EventEmitter {
       sessionIdReady,
       resolveSessionId,
       pendingQuestions: new Map(),
+      pendingToolApprovals: new Map(),
+      permissionMode: "bypassPermissions",
       messageCache: [],
       currentTodos: [],
     };
@@ -297,7 +314,7 @@ export class SessionManager extends EventEmitter {
       options: {
         resume: sessionId,
         cwd,
-        permissionMode: "bypassPermissions",
+        permissionMode: "bypassPermissions" as PermissionMode,
         allowDangerouslySkipPermissions: true,
         abortController,
         includePartialMessages: true,
@@ -355,6 +372,15 @@ export class SessionManager extends EventEmitter {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
+    // Deny all pending tool approvals so Promises don't hang
+    for (const [, pending] of session.pendingToolApprovals) {
+      pending.resolve({
+        allow: false,
+        denyMessage: "Session stopped",
+      });
+    }
+    session.pendingToolApprovals.clear();
+
     // Close all WebSocket connections
     const errMsg = controlMsg({
       type: "error",
@@ -401,6 +427,74 @@ export class SessionManager extends EventEmitter {
     pending.resolve(answers);
     session.pendingQuestions.delete(requestId);
     return true;
+  }
+
+  /**
+   * Resolve a pending tool approval request with user decision.
+   */
+  resolveToolApproval(
+    sessionId: string,
+    requestId: string,
+    decision: "allow" | "deny",
+    denyMessage?: string,
+  ): boolean {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return false;
+    const pending = session.pendingToolApprovals.get(requestId);
+    if (!pending) return false;
+    pending.resolve({
+      allow: decision === "allow",
+      denyMessage,
+    });
+    session.pendingToolApprovals.delete(requestId);
+
+    // Remove the cached approval request so it won't replay
+    const idx = session.messageCache.findIndex(
+      (entry) =>
+        entry.category === "control" &&
+        entry.message.type === "tool_approval_request" &&
+        entry.message.requestId === requestId,
+    );
+    if (idx !== -1) session.messageCache.splice(idx, 1);
+
+    return true;
+  }
+
+  /**
+   * Change the permission mode for a session at runtime.
+   * Mirrors setModel() — calls SDK setPermissionMode + broadcasts to clients.
+   * When switching to bypassPermissions, auto-approves all pending tool approvals.
+   */
+  async setPermissionMode(
+    sessionId: string,
+    mode: PermissionMode,
+  ): Promise<void> {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return;
+
+    await session.query.setPermissionMode(mode);
+    session.permissionMode = mode;
+
+    // If switching to bypass mode, auto-approve all pending tool approvals
+    if (mode === "bypassPermissions") {
+      for (const [requestId, pending] of session.pendingToolApprovals) {
+        pending.resolve({ allow: true });
+        // Remove the cached approval request
+        const idx = session.messageCache.findIndex(
+          (entry) =>
+            entry.category === "control" &&
+            entry.message.type === "tool_approval_request" &&
+            entry.message.requestId === requestId,
+        );
+        if (idx !== -1) session.messageCache.splice(idx, 1);
+      }
+      session.pendingToolApprovals.clear();
+    }
+
+    this.broadcast(
+      session,
+      controlMsg({ type: "permission_mode_changed", mode }),
+    );
   }
 
   /**
@@ -471,9 +565,10 @@ export class SessionManager extends EventEmitter {
   /**
    * Build a canUseTool callback for a session.
    * Intercepts AskUserQuestion to broadcast to WS clients and wait for user answer.
+   * In non-bypass modes, broadcasts tool approval requests and waits for user decision.
    */
   private makeCanUseTool(session: ActiveSession): CanUseTool {
-    return async (toolName, input, _options) => {
+    return async (toolName, input, options) => {
       if (toolName === "AskUserQuestion") {
         const requestId = randomUUID();
         const questions = (input.questions ?? []) as AskUserQuestionItem[];
@@ -505,8 +600,82 @@ export class SessionManager extends EventEmitter {
         };
       }
 
-      // All other tools: allow (bypassPermissions handles the rest)
-      return { behavior: "allow" as const };
+      // bypassPermissions mode: auto-allow all other tools
+      if (session.permissionMode === "bypassPermissions") {
+        return {
+          behavior: "allow" as const,
+          updatedInput: input as Record<string, unknown>,
+        };
+      }
+
+      // Non-bypass mode: request tool approval from the user
+      const requestId = randomUUID();
+      const toolUseId =
+        typeof (options as Record<string, unknown>)?.tool_use_id === "string"
+          ? ((options as Record<string, unknown>).tool_use_id as string)
+          : requestId;
+      const decisionReason =
+        typeof (options as Record<string, unknown>)?.decision_reason ===
+        "string"
+          ? ((options as Record<string, unknown>).decision_reason as string)
+          : undefined;
+
+      // Cache & broadcast approval request
+      const cached = controlMsg({
+        type: "tool_approval_request",
+        requestId,
+        toolName,
+        toolUseId,
+        input: input as Record<string, unknown>,
+        decisionReason,
+      });
+      session.messageCache.push(cached);
+      this.broadcast(session, cached);
+
+      // Wait for user decision (or abort)
+      const decision = await new Promise<{
+        allow: boolean;
+        denyMessage?: string;
+      }>((resolve) => {
+        session.pendingToolApprovals.set(requestId, {
+          toolName,
+          input: input as Record<string, unknown>,
+          resolve,
+        });
+
+        // Listen for abort signal to auto-deny
+        const signal = (options as Record<string, unknown>)
+          ?.signal as AbortSignal;
+        if (signal) {
+          const onAbort = () => {
+            if (session.pendingToolApprovals.has(requestId)) {
+              session.pendingToolApprovals.delete(requestId);
+              resolve({ allow: false, denyMessage: "Aborted" });
+            }
+          };
+          if (signal.aborted) {
+            onAbort();
+          } else {
+            signal.addEventListener("abort", onAbort, { once: true });
+          }
+        }
+      });
+
+      // Remove the cached approval request
+      const approvalIdx = session.messageCache.indexOf(cached);
+      if (approvalIdx !== -1) session.messageCache.splice(approvalIdx, 1);
+
+      if (decision.allow) {
+        return {
+          behavior: "allow" as const,
+          updatedInput: input as Record<string, unknown>,
+        };
+      } else {
+        return {
+          behavior: "deny" as const,
+          message: decision.denyMessage || "Tool call denied by user",
+        };
+      }
     };
   }
 
@@ -580,6 +749,14 @@ export class SessionManager extends EventEmitter {
             });
           }
           session.resolveSessionId(message.session_id);
+
+          // Sync permissionMode from SDK init message
+          const initPerm = (message as unknown as { permissionMode?: string })
+            .permissionMode;
+          if (initPerm) {
+            session.permissionMode =
+              initPerm as ActiveSession["permissionMode"];
+          }
         }
 
         // Status events are transient — broadcast live but don't cache
@@ -589,6 +766,14 @@ export class SessionManager extends EventEmitter {
           "subtype" in message &&
           message.subtype === "status"
         ) {
+          // Sync permissionMode from SDK status message (e.g. ExitPlanMode)
+          const statusPerm = (message as unknown as { permissionMode?: string })
+            .permissionMode;
+          if (statusPerm) {
+            session.permissionMode =
+              statusPerm as ActiveSession["permissionMode"];
+          }
+
           this.broadcast(session, sdkMsg(message));
           continue;
         }

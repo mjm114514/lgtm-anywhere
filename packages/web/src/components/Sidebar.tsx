@@ -7,7 +7,7 @@ interface SidebarProps {
   selectedProject: SelectedProject | null;
   selectedSessionId: string | null;
   onSelectProject: (project: SelectedProject) => void;
-  onSelectSession: (sessionId: string) => void;
+  onSelectSession: (sessionId: string, summary: string) => void;
   onNewSession: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;

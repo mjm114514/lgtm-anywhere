@@ -6,6 +6,7 @@ import {
 import type {
   CreateSessionRequest,
   UpdateSessionRequest,
+  PermissionMode,
 } from "@lgtm-anywhere/shared";
 import { SessionManager } from "../services/session-manager.js";
 
@@ -141,10 +142,34 @@ export function createSessionRoutes(sessionManager: SessionManager): Router {
         await sessionManager.setModel(sessionId, body.model);
       }
 
+      if (body.permissionMode) {
+        const validModes: PermissionMode[] = [
+          "default",
+          "acceptEdits",
+          "bypassPermissions",
+          "plan",
+          "dontAsk",
+        ];
+        if (!validModes.includes(body.permissionMode as PermissionMode)) {
+          res.status(400).json({
+            error: {
+              code: "INVALID_REQUEST",
+              message: `Invalid permission mode: ${body.permissionMode}`,
+            },
+          });
+          return;
+        }
+        await sessionManager.setPermissionMode(
+          sessionId,
+          body.permissionMode as PermissionMode,
+        );
+      }
+
       res.json({
         sessionId,
         title: body.title,
         model: body.model,
+        permissionMode: body.permissionMode,
       });
     } catch (err) {
       next(err);
