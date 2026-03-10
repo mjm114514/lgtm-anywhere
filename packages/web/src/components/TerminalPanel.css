@@ -1,0 +1,268 @@
+/* ── Terminal Panel ── */
+
+.terminal-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  overflow: visible;
+  position: relative;
+}
+
+.terminal-panel--collapsed {
+  height: 0;
+  border-top: none;
+  background: transparent;
+}
+
+/* ── Toggle tab — visually protrudes above the ChatInput ── */
+
+.terminal-toggle-wrapper {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  transform: translateY(-100%);
+  z-index: 10;
+}
+
+.terminal-toggle-tab {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.terminal-panel--collapsed .terminal-toggle-tab {
+  border-bottom: none;
+}
+
+.terminal-toggle-tab:hover {
+  background: #f5f5f5;
+}
+
+.terminal-toggle-arrow {
+  font-size: 8px;
+  color: #888;
+}
+
+.terminal-toggle-label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: "Menlo", "Monaco", "Courier New", monospace;
+  color: #555;
+}
+
+.terminal-toggle-shortcut {
+  font-size: 9px;
+  color: #bbb;
+}
+
+.terminal-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+  background: #1976d2;
+  border-radius: 7px;
+}
+
+/* ── Drag Handle ── */
+
+.terminal-panel-handle {
+  height: 4px;
+  cursor: row-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.terminal-panel-handle:hover {
+  background: #007acc;
+}
+
+/* ── Tab Bar ── */
+
+.terminal-panel-tabs {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 4px;
+  background: #f5f5f5;
+  gap: 1px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.terminal-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  height: 28px;
+  background: #eaeaea;
+  color: #666;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+
+.terminal-panel-tab:hover {
+  background: #ddd;
+  color: #333;
+}
+
+.terminal-panel-tab--active {
+  background: #fff;
+  color: #111;
+}
+
+.terminal-panel-tab-label {
+  pointer-events: none;
+}
+
+.terminal-panel-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
+  color: #999;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.terminal-panel-tab-close:hover {
+  background: #ccc;
+  color: #333;
+}
+
+.terminal-panel-new-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  color: #666;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.terminal-panel-new-btn:hover {
+  background: #e0e0e0;
+  color: #111;
+}
+
+.terminal-panel-tabs-spacer {
+  flex: 1;
+}
+
+/* ── Terminal Body ── */
+
+.terminal-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+}
+
+.terminal-tab-body {
+  position: absolute;
+  inset: 0;
+  display: none;
+  background: #fff;
+}
+
+.terminal-tab-body--active {
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-xterm-container {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 0 0 0 4px;
+  box-sizing: border-box;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.terminal-xterm-container .xterm {
+  background: #fff;
+}
+
+.terminal-xterm-container .xterm-viewport {
+  background-color: #fff !important;
+}
+
+.terminal-xterm-container .xterm-screen {
+  background: #fff;
+}
+
+.terminal-exit-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #888;
+  font-size: 11px;
+  border-radius: 3px;
+}
+
+.terminal-connecting-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #888;
+  font-size: 11px;
+  border-radius: 3px;
+}
+
+.terminal-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 13px;
+}

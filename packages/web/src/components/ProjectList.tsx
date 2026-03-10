@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchProjects } from "../api";
 import { getProjectName, formatRelativeTime } from "../utils/format";
+import { useSessionSync } from "../hooks/useSessionSync";
 import type { ProjectListItem } from "@lgtm-anywhere/shared";
 import type { SelectedProject } from "../App";
 import "./ProjectList.css";
@@ -14,6 +15,8 @@ export function ProjectList({ selectedCwd, onSelect }: ProjectListProps) {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { activeSessionCountByCwd, activeTerminalCountByCwd, synced } =
+    useSessionSync();
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +58,16 @@ export function ProjectList({ selectedCwd, onSelect }: ProjectListProps) {
       {projects.map((p) => {
         const name = getProjectName(p.cwd);
         const isSelected = p.cwd === selectedCwd;
+
+        // Once WS is synced, use real-time counts (defaulting to 0);
+        // before sync, fall back to REST snapshot
+        const activeCount = synced
+          ? (activeSessionCountByCwd.get(p.cwd) ?? 0)
+          : p.activeSessionCount;
+        const terminalCount = synced
+          ? (activeTerminalCountByCwd.get(p.cwd) ?? 0)
+          : p.activeTerminalCount;
+
         return (
           <button
             key={p.cwd}
@@ -63,8 +76,26 @@ export function ProjectList({ selectedCwd, onSelect }: ProjectListProps) {
           >
             <div className="project-list-item-name">{name}</div>
             <div className="project-list-item-meta">
-              {p.sessionCount} session{p.sessionCount !== 1 ? "s" : ""} &middot;{" "}
-              {formatRelativeTime(p.lastModified)}
+              {p.sessionCount} session{p.sessionCount !== 1 ? "s" : ""}
+              {activeCount > 0 && (
+                <>
+                  {" "}
+                  &middot;{" "}
+                  <span className="project-list-active-badge">
+                    {activeCount} active
+                  </span>
+                </>
+              )}
+              {terminalCount > 0 && (
+                <>
+                  {" "}
+                  &middot;{" "}
+                  <span className="project-list-terminal-badge">
+                    {terminalCount} terminal{terminalCount !== 1 ? "s" : ""}
+                  </span>
+                </>
+              )}{" "}
+              &middot; {formatRelativeTime(p.lastModified)}
             </div>
           </button>
         );

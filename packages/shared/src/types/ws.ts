@@ -131,7 +131,11 @@ export interface ControlTodoUpdate {
 
 // ── Global sync WebSocket: Server → Client ──
 
-export type WSSyncMessage = WSSessionStateChange | WSSessionCreated;
+export type WSSyncMessage =
+  | WSSessionStateChange
+  | WSSessionCreated
+  | WSTerminalCreated
+  | WSTerminalClosed;
 
 export interface WSSessionStateChange {
   event: "session_state";
@@ -141,4 +145,14 @@ export interface WSSessionStateChange {
 export interface WSSessionCreated {
   event: "session_created";
   data: { sessionId: string; cwd: string };
+}
+
+export interface WSTerminalCreated {
+  event: "terminal_created";
+  data: { terminalId: string; cwd: string };
+}
+
+export interface WSTerminalClosed {
+  event: "terminal_closed";
+  data: { terminalId: string; cwd: string };
 }

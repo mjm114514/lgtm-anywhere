@@ -56,3 +56,13 @@
   color: #888;
   margin-top: 2px;
 }
+
+.project-list-active-badge {
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.project-list-terminal-badge {
+  color: #1565c0;
+  font-weight: 500;
+}
