@@ -10,6 +10,9 @@ import {
   type SDKUserMessage,
   type SDKUserMessageReplay,
   type SDKResultMessage,
+  type SDKTaskStartedMessage,
+  type SDKTaskProgressMessage,
+  type SDKTaskNotificationMessage,
   type PermissionMode,
 } from "@anthropic-ai/claude-agent-sdk";
 import { EventEmitter } from "node:events";
@@ -354,7 +357,12 @@ export class SessionManager extends EventEmitter {
       if (m.type === "assistant") {
         events.push({
           event: "assistant",
-          data: { type: "assistant", uuid: m.uuid, message: m.message },
+          data: {
+            type: "assistant",
+            uuid: m.uuid,
+            message: m.message,
+            parent_tool_use_id: m.parent_tool_use_id ?? null,
+          },
         });
 
         // Scan assistant message content blocks for the last TodoWrite tool_use
@@ -375,7 +383,12 @@ export class SessionManager extends EventEmitter {
         if (isToolResultMessage(m.message)) {
           events.push({
             event: "tool_result",
-            data: { type: "user", uuid: m.uuid, message: m.message },
+            data: {
+              type: "user",
+              uuid: m.uuid,
+              message: m.message,
+              parent_tool_use_id: m.parent_tool_use_id ?? null,
+            },
           });
         } else {
           const text = extractUserText(m.message);
@@ -473,6 +486,21 @@ export class SessionManager extends EventEmitter {
     }
   }
 
+  /**
+   * Remove cached events matching a predicate.
+   * Used for targeted pruning (e.g., removing task_progress for a specific task_id).
+   */
+  private pruneCacheByPredicate(
+    cache: Array<{ event: string; data: unknown }>,
+    predicate: (entry: { event: string; data: unknown }) => boolean,
+  ): void {
+    for (let i = cache.length - 2; i >= 0; i--) {
+      if (predicate(cache[i])) {
+        cache.splice(i, 1);
+      }
+    }
+  }
+
   private mapMessageToEvent(
     message: SDKMessage,
   ): { event: string; data: unknown } | null {
@@ -489,6 +517,48 @@ export class SessionManager extends EventEmitter {
             },
           };
         }
+        if (message.subtype === "task_started") {
+          const taskMsg = message as SDKTaskStartedMessage;
+          if (!taskMsg.tool_use_id) return null;
+          return {
+            event: "task_started",
+            data: {
+              task_id: taskMsg.task_id,
+              tool_use_id: taskMsg.tool_use_id,
+              description: taskMsg.description,
+              task_type: taskMsg.task_type,
+              prompt: taskMsg.prompt,
+            },
+          };
+        }
+        if (message.subtype === "task_progress") {
+          const taskMsg = message as SDKTaskProgressMessage;
+          if (!taskMsg.tool_use_id) return null;
+          return {
+            event: "task_progress",
+            data: {
+              task_id: taskMsg.task_id,
+              tool_use_id: taskMsg.tool_use_id,
+              description: taskMsg.description,
+              usage: taskMsg.usage,
+              last_tool_name: taskMsg.last_tool_name,
+            },
+          };
+        }
+        if (message.subtype === "task_notification") {
+          const taskMsg = message as SDKTaskNotificationMessage;
+          if (!taskMsg.tool_use_id) return null;
+          return {
+            event: "task_notification",
+            data: {
+              task_id: taskMsg.task_id,
+              tool_use_id: taskMsg.tool_use_id,
+              status: taskMsg.status,
+              summary: taskMsg.summary,
+              usage: taskMsg.usage,
+            },
+          };
+        }
         return null;
 
       case "assistant": {
@@ -499,6 +569,7 @@ export class SessionManager extends EventEmitter {
             type: "assistant",
             uuid: assistantMsg.uuid,
             message: assistantMsg.message,
+            parent_tool_use_id: assistantMsg.parent_tool_use_id,
           },
         };
       }
@@ -526,6 +597,7 @@ export class SessionManager extends EventEmitter {
               uuid: userMsg.uuid,
               message: userMsg.message,
               tool_use_result: userMsg.tool_use_result,
+              parent_tool_use_id: userMsg.parent_tool_use_id,
             },
           };
         }
@@ -613,6 +685,16 @@ export class SessionManager extends EventEmitter {
           // events — they are transient progress indicators.
           if (mapped.event === "tool_result") {
             this.pruneCache(session.messageCache, "tool_progress");
+          }
+
+          // When a task_notification arrives, prune preceding task_progress
+          // events for the same task_id — they are superseded by the final notification.
+          if (mapped.event === "task_notification") {
+            const taskId = (mapped.data as { task_id: string }).task_id;
+            this.pruneCacheByPredicate(session.messageCache, (entry) => {
+              if (entry.event !== "task_progress") return false;
+              return (entry.data as { task_id: string }).task_id === taskId;
+            });
           }
 
           this.broadcast(session, mapped.event, mapped.data);

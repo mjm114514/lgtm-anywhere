@@ -43,7 +43,10 @@ export type WSServerMessage =
   | WSAskUserQuestionMessage
   | WSHistoryBatchStart
   | WSHistoryBatchEnd
-  | WSTodoUpdateMessage;
+  | WSTodoUpdateMessage
+  | WSTaskStartedMessage
+  | WSTaskProgressMessage
+  | WSTaskNotificationMessage;
 
 export interface WSInitMessage {
   event: "init";
@@ -67,6 +70,7 @@ export interface WSAssistantMessage {
     type: "assistant";
     uuid: string;
     message: unknown;
+    parent_tool_use_id: string | null;
   };
 }
 
@@ -86,6 +90,7 @@ export interface WSToolResultMessage {
     uuid?: string;
     message: unknown;
     tool_use_result?: unknown;
+    parent_tool_use_id: string | null;
   };
 }
 
@@ -141,6 +146,49 @@ export interface WSHistoryBatchEnd {
 export interface WSTodoUpdateMessage {
   event: "todo_update";
   data: { todos: import("./todo.js").TodoItem[] };
+}
+
+// ── Subagent task events ──
+
+export interface WSTaskStartedMessage {
+  event: "task_started";
+  data: {
+    task_id: string;
+    tool_use_id: string;
+    description: string;
+    task_type?: string;
+    prompt?: string;
+  };
+}
+
+export interface WSTaskProgressMessage {
+  event: "task_progress";
+  data: {
+    task_id: string;
+    tool_use_id: string;
+    description: string;
+    usage: {
+      total_tokens: number;
+      tool_uses: number;
+      duration_ms: number;
+    };
+    last_tool_name?: string;
+  };
+}
+
+export interface WSTaskNotificationMessage {
+  event: "task_notification";
+  data: {
+    task_id: string;
+    tool_use_id: string;
+    status: "completed" | "failed" | "stopped";
+    summary: string;
+    usage?: {
+      total_tokens: number;
+      tool_uses: number;
+      duration_ms: number;
+    };
+  };
 }
 
 // ── Global sync WebSocket: Server → Client ──
