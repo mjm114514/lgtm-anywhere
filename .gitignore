@@ -8,3 +8,4 @@ dist/
 coverage/
 CLAUDE.local.md
 *.tsbuildinfo
+*.tgz

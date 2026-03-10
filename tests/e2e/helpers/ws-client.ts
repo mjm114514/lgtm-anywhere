@@ -1,16 +1,12 @@
 import WebSocket from "ws";
-
-export interface WSMessage {
-  event: string;
-  data: unknown;
-}
+import type { WSServerMessage } from "@lgtm-anywhere/shared";
 
 export class WSClient {
   private ws: WebSocket;
-  private messages: WSMessage[] = [];
+  private messages: WSServerMessage[] = [];
   private waiters: Array<{
-    predicate: (msg: WSMessage) => boolean;
-    resolve: (msg: WSMessage) => void;
+    predicate: (msg: WSServerMessage) => boolean;
+    resolve: (msg: WSServerMessage) => void;
     reject: (err: Error) => void;
     timer: ReturnType<typeof setTimeout>;
   }> = [];
@@ -18,7 +14,7 @@ export class WSClient {
   private constructor(ws: WebSocket) {
     this.ws = ws;
     ws.on("message", (raw) => {
-      const msg: WSMessage = JSON.parse(raw.toString());
+      const msg: WSServerMessage = JSON.parse(raw.toString());
       this.messages.push(msg);
       // Check if any waiters match
       for (let i = this.waiters.length - 1; i >= 0; i--) {
@@ -41,10 +37,19 @@ export class WSClient {
     });
   }
 
-  /** Wait for a message whose `event` field matches `name`. */
-  waitForEvent(name: string, timeoutMs = 90_000): Promise<WSMessage> {
+  /**
+   * Wait for an SDK message with the given type
+   * (e.g., "result", "assistant", "stream_event").
+   */
+  waitForSdkMessage(
+    type: string,
+    timeoutMs = 90_000,
+  ): Promise<WSServerMessage> {
+    const predicate = (msg: WSServerMessage) =>
+      msg.category === "sdk" && msg.message.type === type;
+
     // Check already-received messages
-    const existing = this.messages.find((m) => m.event === name);
+    const existing = this.messages.find(predicate);
     if (existing) return Promise.resolve(existing);
 
     return new Promise((resolve, reject) => {
@@ -53,23 +58,48 @@ export class WSClient {
         if (idx >= 0) this.waiters.splice(idx, 1);
         reject(
           new Error(
-            `Timed out waiting for event "${name}" after ${timeoutMs}ms`,
+            `Timed out waiting for SDK message "${type}" after ${timeoutMs}ms`,
           ),
         );
       }, timeoutMs);
 
-      this.waiters.push({
-        predicate: (msg) => msg.event === name,
-        resolve,
-        reject,
-        timer,
-      });
+      this.waiters.push({ predicate, resolve, reject, timer });
     });
   }
 
-  /** Shorthand for waitForEvent("result"). */
-  waitForResult(timeoutMs = 90_000): Promise<WSMessage> {
-    return this.waitForEvent("result", timeoutMs);
+  /**
+   * Wait for a control message with the given type
+   * (e.g., "error", "history_batch_end", "session_message").
+   */
+  waitForControlMessage(
+    type: string,
+    timeoutMs = 90_000,
+  ): Promise<WSServerMessage> {
+    const predicate = (msg: WSServerMessage) =>
+      msg.category === "control" && msg.message.type === type;
+
+    // Check already-received messages
+    const existing = this.messages.find(predicate);
+    if (existing) return Promise.resolve(existing);
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const idx = this.waiters.findIndex((w) => w.timer === timer);
+        if (idx >= 0) this.waiters.splice(idx, 1);
+        reject(
+          new Error(
+            `Timed out waiting for control message "${type}" after ${timeoutMs}ms`,
+          ),
+        );
+      }, timeoutMs);
+
+      this.waiters.push({ predicate, resolve, reject, timer });
+    });
+  }
+
+  /** Shorthand for waitForSdkMessage("result"). */
+  waitForResult(timeoutMs = 90_000): Promise<WSServerMessage> {
+    return this.waitForSdkMessage("result", timeoutMs);
   }
 
   /** Send a user message through the WebSocket. */
@@ -78,7 +108,7 @@ export class WSClient {
   }
 
   /** Get all accumulated messages. */
-  getMessages(): WSMessage[] {
+  getMessages(): WSServerMessage[] {
     return [...this.messages];
   }
 
