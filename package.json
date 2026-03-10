@@ -13,7 +13,7 @@
     "clean": "npm run clean -w packages/shared && npm run clean -w packages/server",
     "test": "vitest run",
     "lint": "eslint . && prettier --check .",
-    "lint:fix": "eslint . --fix",
+    "lint:fix": "eslint . --fix && prettier --write .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
