@@ -1,0 +1,142 @@
+.node-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-list-header {
+  padding: 10px 16px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+}
+
+.node-list-status {
+  padding: 24px 16px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}
+
+.node-list-error {
+  color: #d32f2f;
+}
+
+.node-list-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-list-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.node-list-node-header:hover {
+  background: #f0f0f0;
+}
+
+.node-list-node-header--selected {
+  background: #e8f0fe;
+}
+
+.node-list-chevron {
+  font-size: 14px;
+  color: #666;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  width: 14px;
+  display: inline-block;
+  text-align: center;
+}
+
+.node-list-chevron--open {
+  transform: rotate(90deg);
+}
+
+.node-list-node-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  color: #1565c0;
+}
+
+.node-list-node-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.node-list-node-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-list-node-meta {
+  font-size: 11px;
+  color: #888;
+  margin-top: 1px;
+}
+
+.node-list-active-badge {
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+/* Projects under a node */
+.node-list-projects {
+  padding-left: 16px;
+}
+
+.node-list-no-projects {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #aaa;
+  font-style: italic;
+}
+
+.node-list-project-item {
+  display: block;
+  width: 100%;
+  padding: 6px 16px 6px 24px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.node-list-project-item:hover {
+  background: #f0f0f0;
+}
+
+.node-list-project-item--selected {
+  background: #e3f2fd;
+}
+
+.node-list-project-item--selected:hover {
+  background: #bbdefb;
+}
+
+.node-list-project-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.node-list-project-meta {
+  font-size: 11px;
+  color: #888;
+  margin-top: 1px;
+}
