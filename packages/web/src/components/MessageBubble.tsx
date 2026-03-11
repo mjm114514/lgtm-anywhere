@@ -104,8 +104,6 @@ function buildTimelineItems(blocks: ContentBlock[]): TimelineEntry[] {
     } else if (b.type === "tool_use") {
       // Skip Agent tool_use if already rendered as subagent block
       if (b.name === "Agent" && subagentToolUseIds.has(b.toolUseId)) continue;
-      // Skip ExitPlanMode — plan content is already in the text block above
-      if (b.name === "ExitPlanMode") continue;
       items.push({
         type: "tool",
         name: b.name,

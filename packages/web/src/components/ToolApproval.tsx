@@ -1,11 +1,6 @@
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { PermissionMode } from "@lgtm-anywhere/shared";
-import type {
-  ChatMessage,
-  PendingToolApproval,
-} from "../hooks/useSessionSocket";
+import type { PendingToolApproval } from "../hooks/useSessionSocket";
 import "./ToolApproval.css";
 
 interface ToolApprovalProps {
@@ -16,7 +11,6 @@ interface ToolApprovalProps {
     denyMessage?: string,
   ) => void;
   onSetPermissionMode?: (mode: PermissionMode) => void;
-  messages?: ChatMessage[];
 }
 
 const MAX_VALUE_LENGTH = 200;
@@ -60,34 +54,11 @@ export function ToolApproval({
   pendingToolApproval,
   onAnswer,
   onSetPermissionMode,
-  messages,
 }: ToolApprovalProps) {
   const { requestId, toolName, input, decisionReason } = pendingToolApproval;
   const [denyText, setDenyText] = useState("");
 
   const isExitPlanMode = toolName === "ExitPlanMode";
-
-  // Extract plan content from the last assistant message's text blocks
-  let planContent = "";
-  if (isExitPlanMode && messages && messages.length > 0) {
-    // Walk backwards to find the last assistant message
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.role === "assistant" && msg.blocks.length > 0) {
-        // Check if this message contains the ExitPlanMode tool_use
-        const hasExitPlan = msg.blocks.some(
-          (b) => b.type === "tool_use" && b.name === "ExitPlanMode",
-        );
-        if (hasExitPlan) {
-          planContent = msg.blocks
-            .filter((b) => b.type === "text")
-            .map((b) => (b as { type: "text"; text: string }).text)
-            .join("\n");
-          break;
-        }
-      }
-    }
-  }
 
   const inputEntries = Object.entries(input).filter(
     ([key]) => key !== "tool_use_id",
@@ -115,22 +86,6 @@ export function ToolApproval({
         </div>
         {decisionReason && (
           <div className="tool-approval-reason">{decisionReason}</div>
-        )}
-        {planContent && (
-          <div className="tool-approval-ep-plan timeline-text">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                a: ({ href, children }) => (
-                  <a href={href} target="_blank" rel="noopener noreferrer">
-                    {children}
-                  </a>
-                ),
-              }}
-            >
-              {planContent}
-            </ReactMarkdown>
-          </div>
         )}
         <div className="tool-approval-ep-options">
           {EXIT_PLAN_MODE_OPTIONS.map((opt) => (

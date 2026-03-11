@@ -11,7 +11,7 @@ export interface SelectedProject {
 }
 
 export default function App() {
-  const { auth, verify, logout } = useAuth();
+  const { auth, verify } = useAuth();
 
   const [selectedProject, setSelectedProject] =
     useState<SelectedProject | null>(null);
@@ -62,13 +62,6 @@ export default function App() {
 
   return (
     <div className="app">
-      {auth.state === "authenticated" && (
-        <div className="auth-header">
-          <button onClick={logout} className="auth-logout-btn">
-            Logout
-          </button>
-        </div>
-      )}
       <Sidebar
         selectedProject={selectedProject}
         selectedSessionId={selectedSessionId}

@@ -13,26 +13,3 @@
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-
-.auth-header {
-  position: fixed;
-  top: 8px;
-  right: 12px;
-  z-index: 100;
-}
-
-.auth-logout-btn {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(4px);
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 11px;
-  color: #666;
-  cursor: pointer;
-}
-
-.auth-logout-btn:hover {
-  background: #f5f5f5;
-  color: #333;
-}
