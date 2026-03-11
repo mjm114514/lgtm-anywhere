@@ -34,8 +34,10 @@ function TerminalTabBody({
   isActive: boolean;
   wsPathPrefix?: string;
 }) {
-  const { containerRef, isConnected, exitCode, fit, focus } =
-    useTerminal(terminalId, wsPathPrefix);
+  const { containerRef, isConnected, exitCode, fit, focus } = useTerminal(
+    terminalId,
+    wsPathPrefix,
+  );
 
   // Re-fit whenever the container is resized (drag handle, window resize, tab switch)
   useEffect(() => {
@@ -90,13 +92,11 @@ export function TerminalPanel({ cwd, nodeId }: TerminalPanelProps) {
 
   // Build mode-aware API functions
   const fetchTerminalsFn = useCallback(
-    (c: string) =>
-      nodeId ? fetchNodeTerminals(nodeId, c) : fetchTerminals(c),
+    (c: string) => (nodeId ? fetchNodeTerminals(nodeId, c) : fetchTerminals(c)),
     [nodeId],
   );
   const createTerminalFn = useCallback(
-    (c: string) =>
-      nodeId ? createNodeTerminal(nodeId, c) : createTerminal(c),
+    (c: string) => (nodeId ? createNodeTerminal(nodeId, c) : createTerminal(c)),
     [nodeId],
   );
   const deleteTerminalFn = useCallback(

@@ -311,9 +311,7 @@ describe("Hub-Node E2E", () => {
 
       // Send a command through the terminal
       const marker = `__LGTM_TEST_${Date.now()}__`;
-      ws.send(
-        JSON.stringify({ type: "input", data: `echo ${marker}\n` }),
-      );
+      ws.send(JSON.stringify({ type: "input", data: `echo ${marker}\n` }));
 
       // Wait for the echoed marker to appear in output
       const deadline = Date.now() + 10_000;
