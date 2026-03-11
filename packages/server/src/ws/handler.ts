@@ -14,6 +14,8 @@ import { listSessions } from "@anthropic-ai/claude-agent-sdk";
 import { SessionManager } from "../services/session-manager.js";
 import { TerminalManager } from "../terminal/terminal-manager.js";
 import { handleTerminalConnection } from "../terminal/ws-handler.js";
+import type { AuthConfig } from "../auth/config.js";
+import { verifyWsUpgrade } from "../auth/middleware.js";
 
 const WS_PATH_RE = /^\/ws\/sessions\/([^/]+)$/;
 const WS_SYNC_PATH_RE = /^\/ws\/sync$/;
@@ -40,6 +42,7 @@ export function attachWebSocket(
   server: Server,
   sessionManager: SessionManager,
   terminalManager: TerminalManager,
+  authConfig: AuthConfig,
 ): void {
   const wss = new WebSocketServer({ noServer: true });
   const syncClients = new Set<WebSocket>();
@@ -105,6 +108,13 @@ export function attachWebSocket(
   );
 
   server.on("upgrade", (req: IncomingMessage, socket, head) => {
+    // Auth gate for WebSocket upgrades
+    if (!verifyWsUpgrade(req, authConfig)) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 
     const sessionMatch = url.pathname.match(WS_PATH_RE);

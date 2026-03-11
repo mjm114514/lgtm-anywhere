@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
+import { LoginPage } from "./components/LoginPage";
+import { useAuth } from "./hooks/useAuth";
 import "./App.css";
 
 export interface SelectedProject {
@@ -9,6 +11,8 @@ export interface SelectedProject {
 }
 
 export default function App() {
+  const { auth, verify } = useAuth();
+
   const [selectedProject, setSelectedProject] =
     useState<SelectedProject | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
@@ -17,6 +21,21 @@ export default function App() {
   const [selectedSessionSummary, setSelectedSessionSummary] = useState("");
   const [showNewSession, setShowNewSession] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Auth gate
+  if (auth.state === "loading") {
+    return (
+      <div className="auth-loading">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (auth.state === "unauthenticated" || auth.state === "error") {
+    return <LoginPage auth={auth} onVerify={verify} />;
+  }
+
+  // auth.state === "authenticated" || auth.state === "disabled"
 
   const handleSelectProject = (project: SelectedProject) => {
     setSelectedProject(project);

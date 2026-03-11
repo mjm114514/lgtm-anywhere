@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import type { WSTerminalServerMessage } from "@lgtm-anywhere/shared";
+import { fetchWsToken, buildWsUrl } from "../api";
 
 export interface UseTerminalReturn {
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -91,51 +92,57 @@ export function useTerminal(terminalId: string | null): UseTerminalReturn {
     const connect = () => {
       if (disposed) return;
 
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(
-        `${protocol}//${window.location.host}/ws/terminal/${terminalId}`,
-      );
-
-      ws.onopen = () => {
-        retryCount = 0;
-        setIsConnected(true);
-        // Send initial size
-        ws!.send(
-          JSON.stringify({
-            type: "resize",
-            cols: term.cols,
-            rows: term.rows,
-          }),
-        );
-      };
-
-      ws.onmessage = (ev) => {
-        let msg: WSTerminalServerMessage;
-        try {
-          msg = JSON.parse(ev.data);
-        } catch {
-          return;
-        }
-        if (msg.type === "output") {
-          term.write(msg.data);
-        } else if (msg.type === "exit") {
-          setExitCode(msg.exitCode);
-          setIsConnected(false);
-        }
-      };
-
-      ws.onclose = () => {
-        ws = null;
+      (async () => {
+        const token = await fetchWsToken();
         if (disposed) return;
-        setIsConnected(false);
-        const delay = Math.min(1000 * 2 ** retryCount, 30_000);
-        retryCount++;
-        retryTimer = setTimeout(connect, delay);
-      };
 
-      ws.onerror = () => {
-        // onclose fires after onerror — reconnect handled there
-      };
+        const url = buildWsUrl(
+          `/ws/terminal/${terminalId}`,
+          token || undefined,
+        );
+        ws = new WebSocket(url);
+
+        ws.onopen = () => {
+          retryCount = 0;
+          setIsConnected(true);
+          // Send initial size
+          ws!.send(
+            JSON.stringify({
+              type: "resize",
+              cols: term.cols,
+              rows: term.rows,
+            }),
+          );
+        };
+
+        ws.onmessage = (ev) => {
+          let msg: WSTerminalServerMessage;
+          try {
+            msg = JSON.parse(ev.data);
+          } catch {
+            return;
+          }
+          if (msg.type === "output") {
+            term.write(msg.data);
+          } else if (msg.type === "exit") {
+            setExitCode(msg.exitCode);
+            setIsConnected(false);
+          }
+        };
+
+        ws.onclose = () => {
+          ws = null;
+          if (disposed) return;
+          setIsConnected(false);
+          const delay = Math.min(1000 * 2 ** retryCount, 30_000);
+          retryCount++;
+          retryTimer = setTimeout(connect, delay);
+        };
+
+        ws.onerror = () => {
+          // onclose fires after onerror — reconnect handled there
+        };
+      })();
     };
 
     connect();
