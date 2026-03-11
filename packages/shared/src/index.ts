@@ -34,6 +34,15 @@ export type {
   CreateTerminalResponse,
 } from "./types/terminal.js";
 export type {
+  AuthStatusResponse,
+  AuthVerifyRequest,
+  AuthVerifyResponse,
+  AuthVerifyError,
+  AuthMeResponse,
+  AuthWsTokenResponse,
+  AuthStatus,
+} from "./types/auth.js";
+export type {
   PermissionMode,
   WSClientMessage,
   WSMessageSend,

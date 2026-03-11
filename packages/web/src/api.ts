@@ -10,7 +10,10 @@ import type {
 } from "@lgtm-anywhere/shared";
 
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  const res = await fetch(url, {
+    ...init,
+    credentials: "include",
+  });
   if (!res.ok) {
     const body = await res
       .json()
@@ -78,4 +81,26 @@ export function deleteTerminal(
   return fetchJSON<{ id: string; killed: boolean }>(`/api/terminals/${id}`, {
     method: "DELETE",
   });
+}
+
+// ── Auth API ──
+
+/** Fetch a short-lived WS auth token. Returns empty string if auth disabled. */
+export async function fetchWsToken(): Promise<string> {
+  try {
+    const { token } = await fetchJSON<{ token: string }>("/api/auth/ws-token");
+    return token;
+  } catch {
+    return "";
+  }
+}
+
+/** Build a WebSocket URL with optional auth token. */
+export function buildWsUrl(path: string, token?: string): string {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const url = new URL(path, `${protocol}//${window.location.host}`);
+  if (token) {
+    url.searchParams.set("token", token);
+  }
+  return url.toString();
 }

@@ -8,6 +8,7 @@ import type {
   PermissionMode,
 } from "@lgtm-anywhere/shared";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { fetchWsToken, buildWsUrl } from "../api";
 
 // ── Subagent state ──
 
@@ -524,37 +525,44 @@ export function useSessionSocket(
       return;
     }
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(
-      `${protocol}//${window.location.host}/ws/sessions/${sessionId}`,
-    );
-    wsRef.current = ws;
+    let cancelled = false;
+    let ws: WebSocket | null = null;
 
-    ws.onmessage = (ev) => {
-      let msg: WSServerMessage;
-      try {
-        msg = JSON.parse(ev.data);
-      } catch {
-        return;
-      }
+    (async () => {
+      const token = await fetchWsToken();
+      if (cancelled) return;
 
-      if (msg.category === "sdk") {
-        handleSdkMessage(msg.message);
-      } else {
-        handleControlMessage(msg.message);
-      }
-    };
+      const url = buildWsUrl(`/ws/sessions/${sessionId}`, token || undefined);
+      ws = new WebSocket(url);
+      wsRef.current = ws;
 
-    ws.onerror = () => {
-      setError("WebSocket connection error");
-    };
+      ws.onmessage = (ev) => {
+        let msg: WSServerMessage;
+        try {
+          msg = JSON.parse(ev.data);
+        } catch {
+          return;
+        }
 
-    ws.onclose = () => {
-      setIsStreaming(false);
-    };
+        if (msg.category === "sdk") {
+          handleSdkMessage(msg.message);
+        } else {
+          handleControlMessage(msg.message);
+        }
+      };
+
+      ws.onerror = () => {
+        setError("WebSocket connection error");
+      };
+
+      ws.onclose = () => {
+        setIsStreaming(false);
+      };
+    })();
 
     return () => {
-      ws.close();
+      cancelled = true;
+      ws?.close();
       wsRef.current = null;
     };
   }, [sessionId, handleSdkMessage, handleControlMessage]);

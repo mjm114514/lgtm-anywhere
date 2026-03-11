@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { SessionState, WSSyncMessage } from "@lgtm-anywhere/shared";
+import { fetchWsToken, buildWsUrl } from "../api";
 
 interface UseSessionSyncReturn {
   stateMap: Map<string, SessionState>;
@@ -36,65 +37,68 @@ export function useSessionSync(): UseSessionSyncReturn {
   const connectRef = useRef<(() => void) | undefined>(undefined);
 
   const connect = useCallback(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/sync`);
-    wsRef.current = ws;
+    (async () => {
+      const token = await fetchWsToken();
+      const url = buildWsUrl("/ws/sync", token || undefined);
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      retryRef.current = 0;
-      setSynced(true);
-    };
+      ws.onopen = () => {
+        retryRef.current = 0;
+        setSynced(true);
+      };
 
-    ws.onmessage = (ev) => {
-      let msg: WSSyncMessage;
-      try {
-        msg = JSON.parse(ev.data);
-      } catch {
-        return;
-      }
-
-      if (msg.event === "session_state") {
-        setStateMap((prev) => {
-          const next = new Map(prev);
-          next.set(msg.data.sessionId, msg.data.state);
-          return next;
-        });
-      } else if (msg.event === "session_created") {
-        setSessionCwdMap((prev) => {
-          const next = new Map(prev);
-          next.set(msg.data.sessionId, msg.data.cwd);
-          return next;
-        });
-        for (const listener of sessionCreatedListeners.current) {
-          listener(msg.data.sessionId, msg.data.cwd);
+      ws.onmessage = (ev) => {
+        let msg: WSSyncMessage;
+        try {
+          msg = JSON.parse(ev.data);
+        } catch {
+          return;
         }
-      } else if (msg.event === "terminal_created") {
-        setTerminalCwdMap((prev) => {
-          const next = new Map(prev);
-          next.set(msg.data.terminalId, msg.data.cwd);
-          return next;
-        });
-      } else if (msg.event === "terminal_closed") {
-        setTerminalCwdMap((prev) => {
-          const next = new Map(prev);
-          next.delete(msg.data.terminalId);
-          return next;
-        });
-      }
-    };
 
-    ws.onclose = () => {
-      wsRef.current = null;
-      setSynced(false);
-      // Exponential backoff: 1s, 2s, 4s, 8s, …, max 30s
-      const delay = Math.min(1000 * 2 ** retryRef.current, 30_000);
-      retryRef.current++;
-      timerRef.current = setTimeout(() => connectRef.current?.(), delay);
-    };
+        if (msg.event === "session_state") {
+          setStateMap((prev) => {
+            const next = new Map(prev);
+            next.set(msg.data.sessionId, msg.data.state);
+            return next;
+          });
+        } else if (msg.event === "session_created") {
+          setSessionCwdMap((prev) => {
+            const next = new Map(prev);
+            next.set(msg.data.sessionId, msg.data.cwd);
+            return next;
+          });
+          for (const listener of sessionCreatedListeners.current) {
+            listener(msg.data.sessionId, msg.data.cwd);
+          }
+        } else if (msg.event === "terminal_created") {
+          setTerminalCwdMap((prev) => {
+            const next = new Map(prev);
+            next.set(msg.data.terminalId, msg.data.cwd);
+            return next;
+          });
+        } else if (msg.event === "terminal_closed") {
+          setTerminalCwdMap((prev) => {
+            const next = new Map(prev);
+            next.delete(msg.data.terminalId);
+            return next;
+          });
+        }
+      };
 
-    ws.onerror = () => {
-      // onclose will fire after onerror — reconnect handled there
-    };
+      ws.onclose = () => {
+        wsRef.current = null;
+        setSynced(false);
+        // Exponential backoff: 1s, 2s, 4s, 8s, …, max 30s
+        const delay = Math.min(1000 * 2 ** retryRef.current, 30_000);
+        retryRef.current++;
+        timerRef.current = setTimeout(() => connectRef.current?.(), delay);
+      };
+
+      ws.onerror = () => {
+        // onclose will fire after onerror — reconnect handled there
+      };
+    })();
   }, []);
 
   useEffect(() => {

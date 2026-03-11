@@ -255,6 +255,7 @@ export function ChatArea({
             pendingToolApproval={pendingToolApproval}
             onAnswer={answerToolApproval}
             onSetPermissionMode={handlePermissionModeChange}
+            messages={messages}
           />
         )}
         <ChatInput
