@@ -3,7 +3,7 @@ import type {
   PermissionMode,
   UserImageAttachment,
 } from "@lgtm-anywhere/shared";
-import { createSession } from "../api";
+import { createSession, createNodeSession } from "../api";
 import { useSessionSocket } from "../hooks/useSessionSocket";
 import { MessageList } from "./MessageList";
 import type { MessageListHandle } from "./MessageList";
@@ -97,6 +97,7 @@ interface ChatAreaProps {
   sessionSummary: string;
   showNewSession: boolean;
   onSessionCreated: (sessionId: string) => void;
+  nodeId?: string | null;
 }
 
 export function ChatArea({
@@ -105,11 +106,14 @@ export function ChatArea({
   sessionSummary,
   showNewSession,
   onSessionCreated,
+  nodeId,
 }: ChatAreaProps) {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [newSessionPermMode, setNewSessionPermMode] =
     useState<PermissionMode>("bypassPermissions");
+  // Compute WS path prefix for hub mode
+  const wsPathPrefix = nodeId ? `/ws/node/${nodeId}` : undefined;
   const {
     messages,
     isStreaming,
@@ -123,7 +127,7 @@ export function ChatArea({
     answerQuestion,
     answerToolApproval,
     setPermissionMode,
-  } = useSessionSocket(selectedSessionId, newSessionPermMode);
+  } = useSessionSocket(selectedSessionId, newSessionPermMode, wsPathPrefix);
   const messageListRef = useRef<MessageListHandle>(null);
 
   // Reset create state when switching away from new session.
@@ -146,7 +150,11 @@ export function ChatArea({
     setCreating(true);
     setCreateError(null);
     try {
-      const res = await createSession(selectedProject.cwd, {
+      const createFn = nodeId
+        ? (cwd: string, body: Parameters<typeof createSession>[1]) =>
+            createNodeSession(nodeId, cwd, body)
+        : createSession;
+      const res = await createFn(selectedProject.cwd, {
         message: text,
         model: model || undefined,
         permissionMode: newSessionPermMode,
@@ -208,7 +216,7 @@ export function ChatArea({
             }
           />
         </div>
-        <TerminalPanel cwd={selectedProject.cwd} />
+        <TerminalPanel cwd={selectedProject.cwd} nodeId={nodeId} />
       </div>
     );
   }
@@ -263,7 +271,7 @@ export function ChatArea({
         />
         <TodoPanel todos={todos} />
       </div>
-      <TerminalPanel cwd={selectedProject?.cwd ?? null} />
+      <TerminalPanel cwd={selectedProject?.cwd ?? null} nodeId={nodeId} />
     </div>
   );
 }

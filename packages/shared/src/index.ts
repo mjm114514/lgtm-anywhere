@@ -43,6 +43,24 @@ export type {
   AuthStatus,
 } from "./types/auth.js";
 export type {
+  NodeInfo,
+  HubToNodeRequest,
+  HubToNodeWsOpen,
+  HubToNodeWsMessage,
+  HubToNodeWsClose,
+  HubToNodeMessage,
+  HubToNodeChallengeResponse,
+  NodeToHubResponse,
+  NodeToHubWsMessage,
+  NodeToHubWsClose,
+  NodeToHubWsOpen,
+  NodeToHubSyncEvent,
+  NodeToHubChallenge,
+  NodeToHubRegister,
+  NodeToHubMessage,
+  HubInfoResponse,
+} from "./types/hub.js";
+export type {
   PermissionMode,
   WSClientMessage,
   WSMessageSend,

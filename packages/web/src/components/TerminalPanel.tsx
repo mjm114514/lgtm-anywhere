@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { TerminalInfo } from "@lgtm-anywhere/shared";
-import { createTerminal, fetchTerminals, deleteTerminal } from "../api";
+import {
+  createTerminal,
+  fetchTerminals,
+  deleteTerminal,
+  createNodeTerminal,
+  fetchNodeTerminals,
+  deleteNodeTerminal,
+} from "../api";
 import { useTerminal } from "../hooks/useTerminal";
 import "./TerminalPanel.css";
 
@@ -11,6 +18,7 @@ interface TerminalTab {
 
 interface TerminalPanelProps {
   cwd: string | null;
+  nodeId?: string | null;
 }
 
 /**
@@ -20,12 +28,16 @@ interface TerminalPanelProps {
 function TerminalTabBody({
   terminalId,
   isActive,
+  wsPathPrefix,
 }: {
   terminalId: string;
   isActive: boolean;
+  wsPathPrefix?: string;
 }) {
-  const { containerRef, isConnected, exitCode, fit, focus } =
-    useTerminal(terminalId);
+  const { containerRef, isConnected, exitCode, fit, focus } = useTerminal(
+    terminalId,
+    wsPathPrefix,
+  );
 
   // Re-fit whenever the container is resized (drag handle, window resize, tab switch)
   useEffect(() => {
@@ -66,7 +78,7 @@ function TerminalTabBody({
   );
 }
 
-export function TerminalPanel({ cwd }: TerminalPanelProps) {
+export function TerminalPanel({ cwd, nodeId }: TerminalPanelProps) {
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(true);
@@ -74,6 +86,24 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startHeight = useRef(0);
+
+  // Compute WS path prefix for hub mode
+  const wsPathPrefix = nodeId ? `/ws/node/${nodeId}` : undefined;
+
+  // Build mode-aware API functions
+  const fetchTerminalsFn = useCallback(
+    (c: string) => (nodeId ? fetchNodeTerminals(nodeId, c) : fetchTerminals(c)),
+    [nodeId],
+  );
+  const createTerminalFn = useCallback(
+    (c: string) => (nodeId ? createNodeTerminal(nodeId, c) : createTerminal(c)),
+    [nodeId],
+  );
+  const deleteTerminalFn = useCallback(
+    (id: string) =>
+      nodeId ? deleteNodeTerminal(nodeId, id) : deleteTerminal(id),
+    [nodeId],
+  );
 
   // Render-phase reset when cwd changes (avoids setState in effect)
   const [prevCwd, setPrevCwd] = useState(cwd);
@@ -88,7 +118,7 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
     if (!cwd) return;
 
     let cancelled = false;
-    fetchTerminals(cwd)
+    fetchTerminalsFn(cwd)
       .then((terminals: TerminalInfo[]) => {
         if (cancelled) return;
         const newTabs = terminals.map((t, i) => ({
@@ -105,12 +135,12 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [cwd]);
+  }, [cwd, fetchTerminalsFn]);
 
   const handleNewTab = useCallback(async () => {
     if (!cwd) return;
     try {
-      const res = await createTerminal(cwd);
+      const res = await createTerminalFn(cwd);
       const newTab: TerminalTab = {
         id: res.id,
         title: `Terminal ${tabs.length + 1}`,
@@ -121,12 +151,12 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
     } catch (err) {
       console.error("[TerminalPanel] Failed to create terminal:", err);
     }
-  }, [cwd, tabs.length]);
+  }, [cwd, tabs.length, createTerminalFn]);
 
   const handleCloseTab = useCallback(
     async (tabId: string) => {
       try {
-        await deleteTerminal(tabId);
+        await deleteTerminalFn(tabId);
       } catch {
         // ignore — might already be dead
       }
@@ -142,7 +172,7 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
         return next;
       });
     },
-    [activeTabId],
+    [activeTabId, deleteTerminalFn],
   );
 
   // Open panel: expand + ensure at least one tab exists
@@ -150,7 +180,7 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
     setCollapsed(false);
     if (tabs.length === 0 && cwd) {
       try {
-        const res = await createTerminal(cwd);
+        const res = await createTerminalFn(cwd);
         const newTab: TerminalTab = { id: res.id, title: "Terminal 1" };
         setTabs([newTab]);
         setActiveTabId(newTab.id);
@@ -158,7 +188,7 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
         console.error("[TerminalPanel] Failed to create terminal:", err);
       }
     }
-  }, [tabs.length, cwd]);
+  }, [tabs.length, cwd, createTerminalFn]);
 
   const toggleCollapse = useCallback(() => {
     setCollapsed((prev) => {
@@ -283,6 +313,7 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
                 key={tab.id}
                 terminalId={tab.id}
                 isActive={tab.id === activeTabId}
+                wsPathPrefix={wsPathPrefix}
               />
             ))}
             {tabs.length === 0 && (

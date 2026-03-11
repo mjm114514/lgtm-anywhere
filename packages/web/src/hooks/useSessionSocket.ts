@@ -81,6 +81,7 @@ interface UseSessionSocketReturn {
 export function useSessionSocket(
   sessionId: string | null,
   initialPermissionMode?: PermissionMode,
+  wsPathPrefix?: string,
 ): UseSessionSocketReturn {
   const effectiveInitialMode = initialPermissionMode ?? "bypassPermissions";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -532,7 +533,11 @@ export function useSessionSocket(
       const token = await fetchWsToken();
       if (cancelled) return;
 
-      const url = buildWsUrl(`/ws/sessions/${sessionId}`, token || undefined);
+      const wsBase = wsPathPrefix ?? "/ws";
+      const url = buildWsUrl(
+        `${wsBase}/sessions/${sessionId}`,
+        token || undefined,
+      );
       ws = new WebSocket(url);
       wsRef.current = ws;
 
@@ -565,7 +570,7 @@ export function useSessionSocket(
       ws?.close();
       wsRef.current = null;
     };
-  }, [sessionId, handleSdkMessage, handleControlMessage]);
+  }, [sessionId, wsPathPrefix, handleSdkMessage, handleControlMessage]);
 
   const sendMessage = useCallback(
     (text: string, images?: UserImageAttachment[]) => {

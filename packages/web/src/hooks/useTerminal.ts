@@ -14,7 +14,10 @@ export interface UseTerminalReturn {
   focus: () => void;
 }
 
-export function useTerminal(terminalId: string | null): UseTerminalReturn {
+export function useTerminal(
+  terminalId: string | null,
+  wsPathPrefix?: string,
+): UseTerminalReturn {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -96,8 +99,9 @@ export function useTerminal(terminalId: string | null): UseTerminalReturn {
         const token = await fetchWsToken();
         if (disposed) return;
 
+        const wsBase = wsPathPrefix ?? "/ws";
         const url = buildWsUrl(
-          `/ws/terminal/${terminalId}`,
+          `${wsBase}/terminal/${terminalId}`,
           token || undefined,
         );
         ws = new WebSocket(url);
@@ -176,7 +180,7 @@ export function useTerminal(terminalId: string | null): UseTerminalReturn {
         ws = null;
       }
     };
-  }, [terminalId]);
+  }, [terminalId, wsPathPrefix]);
 
   return { containerRef, isConnected, exitCode, fit, focus };
 }
