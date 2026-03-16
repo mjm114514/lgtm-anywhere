@@ -46,7 +46,7 @@ function AppContent() {
     setSelectedProject(project);
     setSelectedSessionId(null);
     setSelectedSessionSummary("");
-    setShowNewSession(false);
+    setShowNewSession(true);
     if (!isHub) {
       setSelectedNodeId(null);
     }
@@ -60,7 +60,7 @@ function AppContent() {
     setSelectedProject(project);
     setSelectedSessionId(null);
     setSelectedSessionSummary("");
-    setShowNewSession(false);
+    setShowNewSession(true);
   };
 
   const handleSelectSession = (sessionId: string, summary: string) => {
