@@ -1,205 +1,205 @@
 # LGTM Anywhere
 
-把 Claude Code 搬到浏览器里。
+Claude Code in your browser.
 
-LGTM Anywhere 是一个全栈 Web 应用，让你通过浏览器远程管理和使用 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agent 会话。支持多会话、多项目、多机器协同，提供完整的对话交互、工具审批、终端模拟等功能。
+LGTM Anywhere is a full-stack web application that lets you manage and interact with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agent sessions from any browser. It supports multi-session, multi-project, and multi-machine orchestration, with a complete set of features including conversational UI, tool approval, and terminal emulation.
 
-## 为什么需要这个项目？
+## Why?
 
-Claude Code 原生是一个命令行工具，只能在本地终端中使用。LGTM Anywhere 解决了以下痛点：
+Claude Code is natively a CLI tool that runs in a local terminal. LGTM Anywhere addresses several limitations:
 
-- **远程访问** — 在任何设备的浏览器中使用 Claude Code，不局限于本地终端
-- **多会话管理** — 同时运行和切换多个 Claude Code 会话，按项目组织
-- **多机器协同** — 通过 Hub-Node 架构，从一个 Web 面板控制多台机器上的 Claude Code
-- **可视化交互** — Markdown 渲染、工具调用可视化、Todo 面板、子 Agent 追踪等
+- **Remote access** — Use Claude Code from any device's browser, not just a local terminal
+- **Multi-session management** — Run and switch between multiple Claude Code sessions, organized by project
+- **Multi-machine orchestration** — Control Claude Code instances across multiple remote machines from a single web dashboard via the Hub-Node architecture
+- **Rich UI** — Markdown rendering, tool call visualization, Todo panel, subagent tracking, and more
 
-## 架构概览
+## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    浏览器 (React)                     │
-│  对话界面 · 工具审批 · Todo 面板 · 终端模拟器          │
-└──────────────────┬──────────────────────────────────┘
-                   │ WebSocket + REST API
-┌──────────────────▼──────────────────────────────────┐
-│                   Express 服务器                      │
-│  SessionManager · MessageQueue · TerminalManager     │
-└──────────────────┬──────────────────────────────────┘
-                   │ Claude Agent SDK
-┌──────────────────▼──────────────────────────────────┐
-│                 Claude Code 进程                      │
-│  代码生成 · 工具调用 · 文件编辑 · 命令执行             │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                     Browser (React)                      │
+│  Chat UI · Tool Approval · Todo Panel · Terminal         │
+└────────────────────────┬────────────────────────────────┘
+                         │ WebSocket + REST API
+┌────────────────────────▼────────────────────────────────┐
+│                    Express Server                        │
+│  SessionManager · MessageQueue · TerminalManager         │
+└────────────────────────┬────────────────────────────────┘
+                         │ Claude Agent SDK
+┌────────────────────────▼────────────────────────────────┐
+│                  Claude Code Process                     │
+│  Code Generation · Tool Calls · File Edits · Commands    │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 项目结构
+### Project Structure
 
 ```
 lgtm-anywhere/
 ├── packages/
-│   ├── shared/     # 共享 TypeScript 类型定义（WS 协议、API 接口等）
-│   ├── server/     # Express + WebSocket 后端服务器
-│   └── web/        # React + Vite 前端应用
-├── tests/e2e/      # 端到端测试
-└── docs/           # 文档
+│   ├── shared/     # Shared TypeScript type definitions (WS protocol, API interfaces)
+│   ├── server/     # Express + WebSocket backend server
+│   └── web/        # React + Vite frontend application
+├── tests/e2e/      # End-to-end tests
+└── docs/           # Documentation
 ```
 
-这是一个 npm workspaces monorepo，全部使用 TypeScript（ESM）。
+This is an npm workspaces monorepo, fully written in TypeScript (ESM).
 
-### 三种运行模式
+### Operating Modes
 
-#### 1. 单机模式（默认）
+#### 1. Standalone (default)
 
-最简单的使用方式。服务器在本地运行，直接管理 Claude Code 会话：
+The simplest way to run. The server runs locally and manages Claude Code sessions directly:
 
 ```
 lgtm-anywhere
 ```
 
-#### 2. Hub 模式
+#### 2. Hub Mode
 
-作为中心协调服务器，本身不运行 Claude Code，而是将请求代理到已连接的 Node：
+Acts as a central coordination server — does not run Claude Code itself, but proxies requests to connected Nodes:
 
 ```
 lgtm-anywhere --hub
 ```
 
-#### 3. Node 模式
+#### 3. Node Mode
 
-连接到 Hub，在本地运行 Claude Code 并接受 Hub 的调度：
+Connects to a Hub, runs Claude Code locally and accepts dispatched requests:
 
 ```
 lgtm-anywhere --connect <hub-url> --access-code <code>
 ```
 
-**Hub-Node 架构示意：**
+**Hub-Node Architecture:**
 
 ```
-┌─────────┐       ┌─────────────┐       ┌──────────┐
-│  浏览器  │◄─────►│   Hub 服务器  │◄─────►│  Node A  │
-└─────────┘       │  (代理/聚合)  │       └──────────┘
-                  │              │◄─────►┌──────────┐
-                  └─────────────┘       │  Node B  │
-                                        └──────────┘
+┌──────────┐       ┌───────────────────┐       ┌──────────┐
+│  Browser  │◄─────►│    Hub Server      │◄─────►│  Node A  │
+└──────────┘       │  (Proxy/Aggregate) │       └──────────┘
+                   │                    │◄─────►┌──────────┐
+                   └───────────────────┘       │  Node B  │
+                                               └──────────┘
 ```
 
-Hub 和 Node 之间通过单条 WebSocket 连接进行通信，使用 HMAC-SHA256 挑战-响应认证，在同一条链路上多路复用 REST 代理、WS 代理和同步事件。
+Hub and Node communicate over a single persistent WebSocket connection, authenticated via HMAC-SHA256 challenge-response, multiplexing REST proxying, WS proxying, and sync events on the same link.
 
-### 核心原理
+### How It Works
 
-1. **流式输入模式** — 使用 `MessageQueue`（实现 `AsyncIterable<SDKUserMessage>`）作为 SDK `query()` 的输入，使 Claude Code 进程在多轮对话中保持存活
-2. **零翻译消息透传** — SDK 消息以 `WSSdkMessage` 形式原样转发到前端，避免额外的协议转换层
-3. **消息缓存与裁剪** — 每个会话维护完整的消息缓存，新客户端连接时回放历史；流式事件在最终消息到达后被自动裁剪
-4. **会话生命周期** — `ACTIVE`（活跃）→ `IDLE`（等待输入）→ `INACTIVE`（空闲 5 分钟后回收），可随时重新激活
+1. **Streaming input mode** — A `MessageQueue` (implementing `AsyncIterable<SDKUserMessage>`) feeds into the SDK's `query()`, keeping the Claude Code process alive across multiple conversational turns
+2. **Zero-translation SDK passthrough** — SDK messages are forwarded verbatim to the frontend as `WSSdkMessage`, avoiding an additional protocol translation layer
+3. **Message caching & pruning** — Each session maintains a full message cache; new WebSocket clients receive a full history replay on connect. Intermediate stream events are automatically pruned when finalized messages arrive
+4. **Session lifecycle** — `ACTIVE` → `IDLE` (awaiting input) → `INACTIVE` (recycled after 5 min idle), with the ability to reactivate at any time
 
-## 功能特性
+## Features
 
-| 功能 | 说明 |
-|------|------|
-| Web 对话界面 | 发送消息，流式查看 Claude 回复（Markdown 渲染） |
-| 多会话管理 | 创建、切换、停止、恢复多个 Claude Code 会话 |
-| 项目组织 | 会话按工作目录（cwd）自动分组为项目 |
-| 工具审批 | 非自动模式下，工具调用需要用户批准/拒绝 |
-| 权限模式 | 5 种模式：Bypass / Default / Accept Edits / Plan / Don't Ask |
-| 交互式问答 | Claude 发起的 AskUserQuestion 在 UI 中展示 |
-| Todo 面板 | 追踪 Claude 的 TodoWrite 调用，显示任务状态 |
-| 子 Agent 追踪 | 嵌套的 Agent 工具调用可折叠展示 |
-| 终端模拟器 | 通过 node-pty + xterm.js 提供完整的浏览器内终端 |
-| 图片支持 | 在消息中附加 base64 图片 |
-| 身份认证 | Token + 签名 Cookie 认证，支持速率限制 |
-| Hub-Node | 多机器编排，从一个面板控制远程 Claude Code |
+| Feature | Description |
+|---------|-------------|
+| Web Chat UI | Send messages and view streaming Claude responses with Markdown rendering |
+| Multi-session | Create, switch between, stop, and resume multiple Claude Code sessions |
+| Project Organization | Sessions automatically grouped by working directory (cwd) |
+| Tool Approval | Tool calls surface for user approval/denial in non-bypass modes |
+| Permission Modes | 5 modes: Bypass / Default / Accept Edits / Plan / Don't Ask |
+| Interactive Q&A | AskUserQuestion prompts from Claude displayed in the UI |
+| Todo Panel | Tracks Claude's TodoWrite calls with task status display |
+| Subagent Tracking | Nested Agent tool calls shown in collapsible blocks |
+| Terminal Emulator | Full PTY terminal in the browser via node-pty + xterm.js |
+| Image Support | Attach base64 images to messages |
+| Authentication | Token + signed cookie auth with rate limiting |
+| Hub-Node | Multi-machine orchestration from a single dashboard |
 
-## 快速开始
+## Getting Started
 
-### 前置要求
+### Prerequisites
 
 - **Node.js** >= 20
-- **Anthropic API Key**（设置为环境变量 `ANTHROPIC_API_KEY`）
-- C++ 编译工具链（用于编译 `node-pty` 原生模块）
+- **Anthropic API Key** (set as `ANTHROPIC_API_KEY` environment variable)
+- C++ build toolchain (required for compiling the `node-pty` native module)
 
-### 安装
+### Installation
 
 ```bash
-git clone https://github.com/mao-code/lgtm-anywhere.git
+git clone https://github.com/mjm114514/lgtm-anywhere.git
 cd lgtm-anywhere
 npm install
 ```
 
-### 开发模式
+### Development
 
 ```bash
 npm run dev
 ```
 
-这会同时启动：
-- 后端服务器（端口 3001，带热重载）
-- Vite 开发服务器（带 HMR，自动代理 API 请求到 3001）
+This starts concurrently:
+- Backend server (port 3001, with hot reload via tsx)
+- Vite dev server (with HMR, proxying API requests to port 3001)
 
-### 生产模式
+### Production
 
 ```bash
-# 构建所有包（shared → server → web）
+# Build all packages (shared → server → web)
 npm run build
 
-# 启动服务器（同时提供 API 和 SPA 静态文件）
+# Start the server (serves both the API and the SPA)
 npm run start
 ```
 
-然后在浏览器中打开 `http://localhost:3001`。
+Then open `http://localhost:3001` in your browser.
 
-### 认证
+### Authentication
 
-首次运行时，服务器会自动生成一个 128 位的认证 token，保存在 `~/.lgtm-anywhere/auth-token` 中，并在终端中显示。在浏览器登录页输入该 token 即可。Session cookie 有效期 24 小时。
+On first run, the server generates a 128-bit auth token saved to `~/.lgtm-anywhere/auth-token` and displayed in the terminal. Enter this token on the browser login page. The session cookie is valid for 24 hours.
 
-如需禁用认证：
+To disable authentication:
 
 ```bash
 lgtm-anywhere --no-auth
 ```
 
-如需刷新 token：
+To refresh the token:
 
 ```bash
 lgtm-anywhere --refresh-token
 ```
 
-## CLI 参数
+## CLI Reference
 
 ```
 Usage: lgtm-anywhere [options]
 
 Options:
-  -p, --port <port>              监听端口（默认: 3001）
-      --no-auth                  禁用认证
-      --hub                      以 Hub 模式启动
-      --connect <hub-url>        连接到 Hub 服务器
-      --access-code <code>       Hub 连接的 access code
-      --refresh-token            刷新认证 token 并退出
-  -h, --help                     显示帮助信息
+  -p, --port <port>              Port to listen on (default: 3001)
+      --no-auth                  Disable authentication
+      --hub                      Start in hub mode
+      --connect <hub-url>        Connect to a hub server
+      --access-code <code>       Access code for hub connection
+      --refresh-token            Refresh the auth token and exit
+  -h, --help                     Show help message
 ```
 
-## 开发
+## Development
 
 ```bash
-# 运行端到端测试
+# Run end-to-end tests
 npm run test
 
-# 代码检查
+# Lint check
 npm run lint
 
-# 自动格式化
+# Auto-format
 npm run format
 ```
 
-## 技术栈
+## Tech Stack
 
-- **前端**: React 19 + Vite 6 + react-markdown + xterm.js
-- **后端**: Express 5 + WebSocket (ws) + node-pty
+- **Frontend**: React 19 + Vite 6 + react-markdown + xterm.js
+- **Backend**: Express 5 + WebSocket (ws) + node-pty
 - **Agent SDK**: @anthropic-ai/claude-agent-sdk
-- **语言**: TypeScript (ESM)
-- **构建**: npm workspaces monorepo
-- **测试**: Vitest (E2E)
-- **代码规范**: ESLint 9 + Prettier
+- **Language**: TypeScript (ESM)
+- **Monorepo**: npm workspaces
+- **Testing**: Vitest (E2E)
+- **Code Style**: ESLint 9 + Prettier
 
 ## License
 
