@@ -94,20 +94,20 @@ Hub and Node communicate over a single persistent WebSocket connection, authenti
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| Web Chat UI | Send messages and view streaming Claude responses with Markdown rendering |
-| Multi-session | Create, switch between, stop, and resume multiple Claude Code sessions |
-| Project Organization | Sessions automatically grouped by working directory (cwd) |
-| Tool Approval | Tool calls surface for user approval/denial in non-bypass modes |
-| Permission Modes | 5 modes: Bypass / Default / Accept Edits / Plan / Don't Ask |
-| Interactive Q&A | AskUserQuestion prompts from Claude displayed in the UI |
-| Todo Panel | Tracks Claude's TodoWrite calls with task status display |
-| Subagent Tracking | Nested Agent tool calls shown in collapsible blocks |
-| Terminal Emulator | Full PTY terminal in the browser via node-pty + xterm.js |
-| Image Support | Attach base64 images to messages |
-| Authentication | Token + signed cookie auth with rate limiting |
-| Hub-Node | Multi-machine orchestration from a single dashboard |
+| Feature              | Description                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| Web Chat UI          | Send messages and view streaming Claude responses with Markdown rendering |
+| Multi-session        | Create, switch between, stop, and resume multiple Claude Code sessions    |
+| Project Organization | Sessions automatically grouped by working directory (cwd)                 |
+| Tool Approval        | Tool calls surface for user approval/denial in non-bypass modes           |
+| Permission Modes     | 5 modes: Bypass / Default / Accept Edits / Plan / Don't Ask               |
+| Interactive Q&A      | AskUserQuestion prompts from Claude displayed in the UI                   |
+| Todo Panel           | Tracks Claude's TodoWrite calls with task status display                  |
+| Subagent Tracking    | Nested Agent tool calls shown in collapsible blocks                       |
+| Terminal Emulator    | Full PTY terminal in the browser via node-pty + xterm.js                  |
+| Image Support        | Attach base64 images to messages                                          |
+| Authentication       | Token + signed cookie auth with rate limiting                             |
+| Hub-Node             | Multi-machine orchestration from a single dashboard                       |
 
 ## Getting Started
 
@@ -132,6 +132,7 @@ npm run dev
 ```
 
 This starts concurrently:
+
 - Backend server (port 3001, with hot reload via tsx)
 - Vite dev server (with HMR, proxying API requests to port 3001)
 
