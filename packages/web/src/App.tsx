@@ -3,7 +3,8 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatArea } from "./components/ChatArea";
 import { LoginPage } from "./components/LoginPage";
 import { useAuth } from "./hooks/useAuth";
-import { HubModeProvider, useHubMode } from "./hooks/useHubMode";
+import { useHubMode, HubModeProvider } from "./hooks/useHubMode";
+import { useMobile } from "./hooks/useMobile";
 import "./App.css";
 
 export interface SelectedProject {
@@ -14,6 +15,7 @@ export interface SelectedProject {
 function AppContent() {
   const { auth, verify } = useAuth();
   const { isHub } = useHubMode();
+  const isMobile = useMobile();
 
   const [selectedProject, setSelectedProject] =
     useState<SelectedProject | null>(null);
@@ -22,7 +24,7 @@ function AppContent() {
   );
   const [selectedSessionSummary, setSelectedSessionSummary] = useState("");
   const [showNewSession, setShowNewSession] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobile);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // Auth gate
@@ -65,6 +67,9 @@ function AppContent() {
     setSelectedSessionId(sessionId);
     setSelectedSessionSummary(summary);
     setShowNewSession(false);
+    if (isMobile) {
+      setSidebarCollapsed(true);
+    }
   };
 
   const handleNewSession = () => {
@@ -89,6 +94,7 @@ function AppContent() {
         onNewSession={handleNewSession}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+        isMobile={isMobile}
       />
       <ChatArea
         selectedProject={selectedProject}
@@ -97,6 +103,9 @@ function AppContent() {
         showNewSession={showNewSession}
         onSessionCreated={handleSessionCreated}
         nodeId={selectedNodeId}
+        isMobile={isMobile}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed((c) => !c)}
       />
     </div>
   );

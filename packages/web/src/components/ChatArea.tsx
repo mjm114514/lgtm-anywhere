@@ -98,6 +98,9 @@ interface ChatAreaProps {
   showNewSession: boolean;
   onSessionCreated: (sessionId: string) => void;
   nodeId?: string | null;
+  isMobile: boolean;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
 }
 
 export function ChatArea({
@@ -107,6 +110,9 @@ export function ChatArea({
   showNewSession,
   onSessionCreated,
   nodeId,
+  isMobile,
+  sidebarCollapsed,
+  onToggleSidebar,
 }: ChatAreaProps) {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -193,6 +199,15 @@ export function ChatArea({
     return (
       <div className="chat-area">
         <div className="chat-area-header">
+          {isMobile && sidebarCollapsed && (
+            <button
+              className="sidebar-menu-btn"
+              onClick={onToggleSidebar}
+              title="Open sidebar"
+            >
+              &#9776;
+            </button>
+          )}
           <span className="chat-area-header-title">New Session</span>
           <PermissionModeSelect
             value={newSessionPermMode}
@@ -224,6 +239,17 @@ export function ChatArea({
   if (!selectedSessionId) {
     return (
       <div className="chat-area">
+        {isMobile && sidebarCollapsed && (
+          <div className="chat-area-header">
+            <button
+              className="sidebar-menu-btn"
+              onClick={onToggleSidebar}
+              title="Open sidebar"
+            >
+              &#9776;
+            </button>
+          </div>
+        )}
         <div className="chat-area-empty">
           {selectedProject
             ? "Select a session or create a new one"
@@ -236,6 +262,15 @@ export function ChatArea({
   return (
     <div className="chat-area">
       <div className="chat-area-header">
+        {isMobile && sidebarCollapsed && (
+          <button
+            className="sidebar-menu-btn"
+            onClick={onToggleSidebar}
+            title="Open sidebar"
+          >
+            &#9776;
+          </button>
+        )}
         <span className="chat-area-header-title">
           {sessionSummary || selectedSessionId.slice(0, 8)}
         </span>
