@@ -49,6 +49,7 @@ export function useTerminal(
     // ── xterm setup ──
     const term = new Terminal({
       cursorBlink: true,
+      allowProposedApi: true,
       fontSize: 13,
       fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
       theme: {
@@ -85,6 +86,12 @@ export function useTerminal(
 
     term.open(containerRef.current);
     requestAnimationFrame(() => fitAddon.fit());
+
+    // Ensure clicks on the container always focus xterm's hidden textarea.
+    // This prevents focus loss after alternate-screen redraws (vim, etc.).
+    const container = containerRef.current;
+    const handleContainerClick = () => term.focus();
+    container.addEventListener("click", handleContainerClick);
 
     // ── WS connection ──
     let disposed = false;
@@ -151,8 +158,15 @@ export function useTerminal(
 
     connect();
 
-    // terminal input → WS
+    // terminal input → WS (UTF-8 string data — covers most keystrokes)
     const inputDisposable = term.onData((data) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "input", data }));
+      }
+    });
+
+    // terminal binary input → WS (raw binary sequences from some key combos)
+    const binaryDisposable = term.onBinary((data) => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "input", data }));
       }
@@ -169,7 +183,9 @@ export function useTerminal(
     return () => {
       disposed = true;
       clearTimeout(retryTimer);
+      container.removeEventListener("click", handleContainerClick);
       inputDisposable.dispose();
+      binaryDisposable.dispose();
       resizeDisposable.dispose();
       fitRef.current = null;
       termRef.current = null;

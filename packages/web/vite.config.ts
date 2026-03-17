@@ -4,6 +4,10 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
+    // ES2021+ supports ||= (logical OR assignment). Without this, Rollup
+    // down-levels ||= into a pattern that drops the variable declaration,
+    // causing "i is not defined" inside xterm.js requestMode.
+    target: "es2022",
     rollupOptions: {
       output: {
         manualChunks: {

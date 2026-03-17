@@ -211,6 +211,7 @@ export function TerminalPanel({ cwd, nodeId }: TerminalPanelProps) {
   }
 
   // Cmd+J (macOS) / Ctrl+J (Windows/Linux) to toggle panel
+  // Skip when focus is inside an xterm terminal — Ctrl+J is a valid terminal key (LF)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -219,6 +220,12 @@ export function TerminalPanel({ cwd, nodeId }: TerminalPanelProps) {
         !e.shiftKey &&
         !e.altKey
       ) {
+        // Don't intercept if focus is inside a terminal (xterm uses a hidden textarea)
+        const active = document.activeElement;
+        if (active && active.closest(".terminal-xterm-container")) {
+          // Only Cmd+J (macOS) toggles from inside terminal; Ctrl+J is sent to PTY
+          if (!e.metaKey) return;
+        }
         e.preventDefault();
         setCollapsed((prev) => !prev);
       }
