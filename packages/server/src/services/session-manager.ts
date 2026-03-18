@@ -545,9 +545,7 @@ export class SessionManager extends EventEmitter {
         if (!m.parent_tool_use_id) {
           const msg = m.message as Record<string, unknown> | undefined;
           if (msg && Array.isArray(msg.content)) {
-            for (const block of msg.content as Array<
-              Record<string, unknown>
-            >) {
+            for (const block of msg.content as Array<Record<string, unknown>>) {
               if (block.type === "tool_use" && block.name === "TodoWrite") {
                 const blockInput = block.input as
                   | Record<string, unknown>

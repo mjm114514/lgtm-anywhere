@@ -238,27 +238,22 @@ function SubagentBlock({
   const isFailed = task.status === "failed" || task.status === "stopped";
 
   // ── Real-time ticking timer ──
-  const [elapsed, setElapsed] = useState(() =>
-    isRunning ? (Date.now() - task.startedAt) / 1000 : 0,
-  );
+  const [tick, setTick] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!isRunning) {
-      // When done, show final duration from usage if available
-      if (task.usage) {
-        setElapsed(task.usage.duration_ms / 1000);
-      }
-      return;
-    }
-    // Tick every second while running
-    setElapsed((Date.now() - task.startedAt) / 1000);
+    if (!isRunning) return;
     const interval = setInterval(() => {
-      setElapsed((Date.now() - task.startedAt) / 1000);
+      setTick(Date.now());
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning, task.startedAt, task.usage]);
+  }, [isRunning]);
 
-  const durationStr = formatDuration(elapsed);
+  // When done, use final SDK duration; while running, compute from wall clock
+  const durationStr = formatDuration(
+    !isRunning && task.usage
+      ? task.usage.duration_ms / 1000
+      : (tick - task.startedAt) / 1000,
+  );
 
   const toolCount = task.innerBlocks.filter(
     (b) => b.type === "tool_use",
