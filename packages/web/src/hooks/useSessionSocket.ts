@@ -21,6 +21,7 @@ export interface SubagentState {
   summary?: string;
   result?: string;
   lastToolName?: string;
+  startedAt: number; // Date.now() when the subagent started
   usage?: {
     total_tokens: number;
     tool_uses: number;
@@ -167,6 +168,7 @@ export function useSessionSocket(
           summary: defaults?.summary,
           result: defaults?.result,
           lastToolName: defaults?.lastToolName,
+          startedAt: defaults?.startedAt ?? Date.now(),
           usage: defaults?.usage,
           innerBlocks: defaults?.innerBlocks ?? [],
         };

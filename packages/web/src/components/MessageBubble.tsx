@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -211,6 +211,18 @@ function ToolBlock({
 
 // ── Subagent block ──
 
+/** Format seconds into m:ss or h:mm:ss */
+function formatDuration(totalSec: number): string {
+  const s = Math.floor(totalSec);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  if (m < 60) return `${m}:${sec.toString().padStart(2, "0")}`;
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${h}:${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+}
+
 function SubagentBlock({
   task,
   result,
@@ -220,23 +232,40 @@ function SubagentBlock({
   result?: string;
   cwd?: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [toolsExpanded, setToolsExpanded] = useState(false);
 
   const isRunning = task.status === "running";
   const isFailed = task.status === "failed" || task.status === "stopped";
+
+  // ── Real-time ticking timer ──
+  const [tick, setTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = setInterval(() => {
+      setTick(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning]);
+
+  // When done, use final SDK duration; while running, compute from wall clock
+  const durationStr = formatDuration(
+    !isRunning && task.usage
+      ? task.usage.duration_ms / 1000
+      : (tick - task.startedAt) / 1000,
+  );
 
   const toolCount = task.innerBlocks.filter(
     (b) => b.type === "tool_use",
   ).length;
 
-  const durationSec = task.usage
-    ? (task.usage.duration_ms / 1000).toFixed(1)
-    : null;
-
   const tokenCount = task.usage ? task.usage.total_tokens : null;
 
-  // Build inner timeline items for expandable view
-  const innerItems = buildTimelineItems(task.innerBlocks);
+  // ── Last N tool calls for the preview box ──
+  const toolBlocks = task.innerBlocks.filter(
+    (b) => b.type === "tool_use",
+  ) as Array<ContentBlock & { type: "tool_use" }>;
+  const lastTools = toolBlocks.slice(-5);
 
   const dotClass = isFailed
     ? "timeline-dot--subagent-failed"
@@ -248,48 +277,50 @@ function SubagentBlock({
     <div className="timeline-item">
       <div className={`timeline-dot timeline-dot--subagent ${dotClass}`} />
       <div className="timeline-content">
-        <div className="subagent-header" onClick={() => setExpanded(!expanded)}>
+        <div className="subagent-header">
           <span className="subagent-label">Agent</span>
           <span className="subagent-description">{task.description}</span>
           {isRunning && task.lastToolName && (
             <span className="subagent-activity">{task.lastToolName}</span>
           )}
-          <span
-            className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}
-          >
-            &#9656;
-          </span>
         </div>
 
         {/* Stats line */}
-        {(toolCount > 0 || durationSec || tokenCount) && (
+        {(toolCount > 0 || durationStr || tokenCount) && (
           <div className="subagent-stats">
             {toolCount > 0 && (
               <span>
                 {toolCount} tool call{toolCount !== 1 ? "s" : ""}
               </span>
             )}
-            {durationSec && <span>{durationSec}s</span>}
+            <span>{durationStr}</span>
             {tokenCount && <span>{tokenCount.toLocaleString()} tokens</span>}
+          </div>
+        )}
+
+        {/* Tool calls preview box — shows last 5 by default, all when expanded */}
+        {toolBlocks.length > 0 && (
+          <div
+            className={`subagent-tools-preview ${toolsExpanded ? "subagent-tools-preview--open" : ""}`}
+            onClick={() => setToolsExpanded(!toolsExpanded)}
+          >
+            <ul className="subagent-tools-preview-list">
+              {(toolsExpanded ? toolBlocks : lastTools).map((tool, i) => (
+                <li key={i} className="subagent-tools-preview-item">
+                  <span className="subagent-tools-preview-name">
+                    {tool.name}
+                  </span>
+                  <span className="subagent-tools-preview-input">
+                    {formatToolInput(tool.name, tool.input, cwd)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
         {/* Result — expandable like ToolResult */}
         {result && <ToolResult content={result} />}
-
-        {/* Expandable inner timeline */}
-        {expanded && innerItems.length > 0 && (
-          <div className="subagent-inner">
-            {innerItems.map((innerItem, i) => (
-              <TimelineItem
-                key={i}
-                item={innerItem}
-                isStreaming={false}
-                cwd={cwd}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

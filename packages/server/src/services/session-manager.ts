@@ -541,15 +541,18 @@ export class SessionManager extends EventEmitter {
         );
 
         // Scan assistant message content blocks for the last TodoWrite tool_use
-        const msg = m.message as Record<string, unknown> | undefined;
-        if (msg && Array.isArray(msg.content)) {
-          for (const block of msg.content as Array<Record<string, unknown>>) {
-            if (block.type === "tool_use" && block.name === "TodoWrite") {
-              const blockInput = block.input as
-                | Record<string, unknown>
-                | undefined;
-              if (blockInput && Array.isArray(blockInput.todos)) {
-                lastTodos = blockInput.todos as TodoItem[];
+        // Only from top-level messages (not subagent) to avoid overwriting main todos
+        if (!m.parent_tool_use_id) {
+          const msg = m.message as Record<string, unknown> | undefined;
+          if (msg && Array.isArray(msg.content)) {
+            for (const block of msg.content as Array<Record<string, unknown>>) {
+              if (block.type === "tool_use" && block.name === "TodoWrite") {
+                const blockInput = block.input as
+                  | Record<string, unknown>
+                  | undefined;
+                if (blockInput && Array.isArray(blockInput.todos)) {
+                  lastTodos = blockInput.todos as TodoItem[];
+                }
               }
             }
           }
@@ -849,7 +852,12 @@ export class SessionManager extends EventEmitter {
         // Extract TodoWrite calls from assistant messages.
         // canUseTool is never called for TodoWrite (SDK auto-allows it),
         // so we detect it from the finalized assistant message content blocks.
-        if (message.type === "assistant") {
+        // Only extract from top-level assistant messages (not subagent ones)
+        // to prevent subagent todos from overwriting the main agent's todos.
+        if (
+          message.type === "assistant" &&
+          !("parent_tool_use_id" in message && message.parent_tool_use_id)
+        ) {
           const todos = extractTodosFromAssistant(message);
           if (todos) {
             session.currentTodos = todos;
