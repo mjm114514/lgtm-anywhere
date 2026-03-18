@@ -311,6 +311,111 @@
     border-color 0.15s ease;
 }
 
+/* ── Edit diff view ── */
+.edit-diff {
+  margin-top: 6px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.edit-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f6f8fa;
+  border-bottom: 1px solid #d0d7de;
+  cursor: pointer;
+  user-select: none;
+}
+
+.edit-diff-header:hover {
+  background: #eef1f4;
+}
+
+.edit-diff-file {
+  font-weight: 600;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-diff-stats {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.edit-diff-additions {
+  color: #1a7f37;
+}
+
+.edit-diff-deletions {
+  color: #cf222e;
+}
+
+.edit-diff-body {
+  overflow-x: auto;
+  background: #fff;
+}
+
+.edit-diff-line {
+  display: flex;
+  white-space: pre;
+  min-height: 20px;
+}
+
+.edit-diff-line--add {
+  background: #dafbe1;
+}
+
+.edit-diff-line--del {
+  background: #ffebe9;
+}
+
+.edit-diff-line--ctx {
+  background: #fff;
+}
+
+.edit-diff-line-prefix {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  color: #656d76;
+  user-select: none;
+}
+
+.edit-diff-line--add .edit-diff-line-prefix {
+  color: #1a7f37;
+}
+
+.edit-diff-line--del .edit-diff-line-prefix {
+  color: #cf222e;
+}
+
+.edit-diff-line-content {
+  flex: 1;
+  padding-right: 12px;
+}
+
+.edit-diff-status {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #1a7f37;
+  background: #f6f8fa;
+  border-top: 1px solid #d0d7de;
+  font-weight: 600;
+}
+
 /* ── Subagent block ── */
 .timeline-dot--subagent {
   width: 10px;

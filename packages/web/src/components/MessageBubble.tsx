@@ -203,7 +203,11 @@ function ToolBlock({
             )}
           </div>
         )}
-        {item.result && <ToolResult content={item.result} />}
+        {item.name === "Edit" ? (
+          <EditDiffResult input={item.input} result={item.result} cwd={cwd} />
+        ) : (
+          item.result && <ToolResult content={item.result} />
+        )}
       </div>
     </div>
   );
@@ -342,6 +346,121 @@ function ToolResult({ content }: { content: string }) {
       </pre>
     </div>
   );
+}
+
+/** Render a unified diff view for Edit tool results. */
+function EditDiffResult({
+  input,
+  result,
+  cwd,
+}: {
+  input: unknown;
+  result?: string;
+  cwd?: string;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const obj = (input && typeof input === "object" ? input : {}) as Record<
+    string,
+    unknown
+  >;
+  const oldStr = (typeof obj.old_string === "string" ? obj.old_string : "") as string;
+  const newStr = (typeof obj.new_string === "string" ? obj.new_string : "") as string;
+  const filePath =
+    typeof obj.file_path === "string" ? stripCwd(obj.file_path, cwd) : "";
+
+  // Build unified diff lines
+  const oldLines = oldStr.split("\n");
+  const newLines = newStr.split("\n");
+  const diffLines = computeUnifiedDiff(oldLines, newLines);
+
+  return (
+    <div className="edit-diff">
+      <div
+        className="edit-diff-header"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="edit-diff-file">{filePath}</span>
+        <span className="edit-diff-stats">
+          <span className="edit-diff-additions">
+            +{newLines.length}
+          </span>
+          <span className="edit-diff-deletions">
+            -{oldLines.length}
+          </span>
+        </span>
+        <span
+          className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}
+        >
+          &#9656;
+        </span>
+      </div>
+      {expanded && (
+        <div className="edit-diff-body">
+          {diffLines.map((line, i) => (
+            <div
+              key={i}
+              className={`edit-diff-line ${
+                line.type === "add"
+                  ? "edit-diff-line--add"
+                  : line.type === "del"
+                    ? "edit-diff-line--del"
+                    : "edit-diff-line--ctx"
+              }`}
+            >
+              <span className="edit-diff-line-prefix">
+                {line.type === "add" ? "+" : line.type === "del" ? "-" : " "}
+              </span>
+              <span className="edit-diff-line-content">{line.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {result && (
+        <div className="edit-diff-status">
+          {result.toLowerCase().includes("error") ? "Failed" : "Applied"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type DiffLine = { type: "add" | "del" | "ctx"; text: string };
+
+/** Simple LCS-based unified diff. */
+function computeUnifiedDiff(oldLines: string[], newLines: string[]): DiffLine[] {
+  // Build LCS table
+  const m = oldLines.length;
+  const n = newLines.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array(n + 1).fill(0),
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        oldLines[i - 1] === newLines[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  // Backtrack to produce diff
+  const result: DiffLine[] = [];
+  let i = m;
+  let j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      result.push({ type: "ctx", text: oldLines[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.push({ type: "add", text: newLines[j - 1] });
+      j--;
+    } else {
+      result.push({ type: "del", text: oldLines[i - 1] });
+      i--;
+    }
+  }
+  return result.reverse();
 }
 
 /** Strip cwd prefix from a file path for shorter display. */
