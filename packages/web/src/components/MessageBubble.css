@@ -335,7 +335,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
   font-size: 13px;
   line-height: 1.4;
   user-select: none;
@@ -378,12 +377,6 @@
   color: #888;
   font-family:
     "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
-}
-
-.subagent-inner {
-  margin-top: 6px;
-  padding-left: 12px;
-  border-left: 2px solid #ddd;
 }
 
 /* ── Subagent tools preview box ── */

@@ -232,7 +232,6 @@ function SubagentBlock({
   result?: string;
   cwd?: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [toolsExpanded, setToolsExpanded] = useState(false);
 
   const isRunning = task.status === "running";
@@ -273,9 +272,6 @@ function SubagentBlock({
   ) as Array<ContentBlock & { type: "tool_use" }>;
   const lastTools = toolBlocks.slice(-5);
 
-  // Build inner timeline items for full expandable view
-  const innerItems = buildTimelineItems(task.innerBlocks);
-
   const dotClass = isFailed
     ? "timeline-dot--subagent-failed"
     : isRunning
@@ -286,17 +282,12 @@ function SubagentBlock({
     <div className="timeline-item">
       <div className={`timeline-dot timeline-dot--subagent ${dotClass}`} />
       <div className="timeline-content">
-        <div className="subagent-header" onClick={() => setExpanded(!expanded)}>
+        <div className="subagent-header">
           <span className="subagent-label">Agent</span>
           <span className="subagent-description">{task.description}</span>
           {isRunning && task.lastToolName && (
             <span className="subagent-activity">{task.lastToolName}</span>
           )}
-          <span
-            className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}
-          >
-            &#9656;
-          </span>
         </div>
 
         {/* Stats line */}
@@ -335,20 +326,6 @@ function SubagentBlock({
 
         {/* Result — expandable like ToolResult */}
         {result && <ToolResult content={result} />}
-
-        {/* Expandable inner timeline */}
-        {expanded && innerItems.length > 0 && (
-          <div className="subagent-inner">
-            {innerItems.map((innerItem, i) => (
-              <TimelineItem
-                key={i}
-                item={innerItem}
-                isStreaming={false}
-                cwd={cwd}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
