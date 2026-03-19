@@ -348,76 +348,60 @@ function ToolResult({ content }: { content: string }) {
   );
 }
 
+/** Max visible diff lines before collapsing. */
+const DIFF_MAX_LINES = 8;
+
 /** Render a unified diff view for Edit tool results. */
 function EditDiffResult({
   input,
-  result,
-  cwd,
 }: {
   input: unknown;
   result?: string;
   cwd?: string;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const obj = (input && typeof input === "object" ? input : {}) as Record<
     string,
     unknown
   >;
   const oldStr = (typeof obj.old_string === "string" ? obj.old_string : "") as string;
   const newStr = (typeof obj.new_string === "string" ? obj.new_string : "") as string;
-  const filePath =
-    typeof obj.file_path === "string" ? stripCwd(obj.file_path, cwd) : "";
 
   // Build unified diff lines
   const oldLines = oldStr.split("\n");
   const newLines = newStr.split("\n");
   const diffLines = computeUnifiedDiff(oldLines, newLines);
 
+  const truncated = diffLines.length > DIFF_MAX_LINES;
+  const visibleLines = expanded ? diffLines : diffLines.slice(0, DIFF_MAX_LINES);
+
   return (
-    <div className="edit-diff">
-      <div
-        className="edit-diff-header"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <span className="edit-diff-file">{filePath}</span>
-        <span className="edit-diff-stats">
-          <span className="edit-diff-additions">
-            +{newLines.length}
-          </span>
-          <span className="edit-diff-deletions">
-            -{oldLines.length}
-          </span>
-        </span>
-        <span
-          className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}
-        >
-          &#9656;
-        </span>
+    <div
+      className={`edit-diff ${truncated ? "edit-diff--clickable" : ""}`}
+      onClick={() => truncated && setExpanded(!expanded)}
+    >
+      <div className="edit-diff-body">
+        {visibleLines.map((line, i) => (
+          <div
+            key={i}
+            className={`edit-diff-line ${
+              line.type === "add"
+                ? "edit-diff-line--add"
+                : line.type === "del"
+                  ? "edit-diff-line--del"
+                  : "edit-diff-line--ctx"
+            }`}
+          >
+            <span className="edit-diff-line-prefix">
+              {line.type === "add" ? "+" : line.type === "del" ? "-" : " "}
+            </span>
+            <span className="edit-diff-line-content">{line.text}</span>
+          </div>
+        ))}
       </div>
-      {expanded && (
-        <div className="edit-diff-body">
-          {diffLines.map((line, i) => (
-            <div
-              key={i}
-              className={`edit-diff-line ${
-                line.type === "add"
-                  ? "edit-diff-line--add"
-                  : line.type === "del"
-                    ? "edit-diff-line--del"
-                    : "edit-diff-line--ctx"
-              }`}
-            >
-              <span className="edit-diff-line-prefix">
-                {line.type === "add" ? "+" : line.type === "del" ? "-" : " "}
-              </span>
-              <span className="edit-diff-line-content">{line.text}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {result && (
-        <div className="edit-diff-status">
-          {result.toLowerCase().includes("error") ? "Failed" : "Applied"}
+      {truncated && !expanded && (
+        <div className="edit-diff-truncated">
+          {diffLines.length - DIFF_MAX_LINES} more lines...
         </div>
       )}
     </div>
