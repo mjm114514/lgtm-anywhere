@@ -348,7 +348,7 @@ function ToolResult({ content }: { content: string }) {
   );
 }
 
-/** Max visible diff lines before collapsing. */
+/** Max visible diff lines before collapsing (show 8 lines, last one fades). */
 const DIFF_MAX_LINES = 8;
 
 /** Render a unified diff view for Edit tool results. */
@@ -377,7 +377,7 @@ function EditDiffResult({
 
   return (
     <div
-      className={`edit-diff ${truncated ? "edit-diff--clickable" : ""}`}
+      className={`edit-diff ${truncated ? "edit-diff--clickable" : ""} ${truncated && !expanded ? "edit-diff--collapsed" : ""}`}
       onClick={() => truncated && setExpanded(!expanded)}
     >
       <div className="edit-diff-body">
@@ -399,11 +399,7 @@ function EditDiffResult({
           </div>
         ))}
       </div>
-      {truncated && !expanded && (
-        <div className="edit-diff-truncated">
-          {diffLines.length - DIFF_MAX_LINES} more lines...
-        </div>
-      )}
+      {truncated && !expanded && <div className="edit-diff-fade" />}
     </div>
   );
 }
