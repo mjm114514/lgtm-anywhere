@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -177,6 +177,20 @@ function ToolBlock({
   const inputSummary = formatToolInput(item.name, item.input, cwd);
   const inProgress = isInProgress && !item.result;
 
+  // Compute +/- line stats for Edit tool
+  const editStats = useMemo(() => {
+    if (item.name !== "Edit") return null;
+    const obj = (item.input && typeof item.input === "object" ? item.input : {}) as Record<string, unknown>;
+    const oldStr = typeof obj.old_string === "string" ? obj.old_string : "";
+    const newStr = typeof obj.new_string === "string" ? obj.new_string : "";
+    const oldLines = oldStr.split("\n");
+    const newLines = newStr.split("\n");
+    const diff = computeUnifiedDiff(oldLines, newLines);
+    const adds = diff.filter((l) => l.type === "add").length;
+    const dels = diff.filter((l) => l.type === "del").length;
+    return { adds, dels };
+  }, [item.name, item.input]);
+
   return (
     <div className="timeline-item">
       <div
@@ -187,6 +201,12 @@ function ToolBlock({
           <span className="tool-name">{item.name}</span>
           {inputSummary && (
             <span className="tool-input-summary">{inputSummary}</span>
+          )}
+          {editStats && (
+            <span className="tool-edit-stats">
+              {editStats.adds > 0 && <span className="tool-edit-stats--add">+{editStats.adds}</span>}
+              {editStats.dels > 0 && <span className="tool-edit-stats--del">-{editStats.dels}</span>}
+            </span>
           )}
           <span
             className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}

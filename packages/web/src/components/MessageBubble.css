@@ -249,6 +249,24 @@
   max-width: 500px;
 }
 
+.tool-edit-stats {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-weight: 600;
+}
+
+.tool-edit-stats--add {
+  color: #1a7f37;
+}
+
+.tool-edit-stats--del {
+  color: #cf222e;
+}
+
 .tool-chevron {
   color: #999;
   font-size: 11px;
