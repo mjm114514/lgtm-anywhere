@@ -392,6 +392,8 @@ function EditDiffResult({
                   : "edit-diff-line--ctx"
             }`}
           >
+            <span className="edit-diff-line-num">{line.oldNum ?? ""}</span>
+            <span className="edit-diff-line-num">{line.newNum ?? ""}</span>
             <span className="edit-diff-line-prefix">
               {line.type === "add" ? "+" : line.type === "del" ? "-" : " "}
             </span>
@@ -404,7 +406,7 @@ function EditDiffResult({
   );
 }
 
-type DiffLine = { type: "add" | "del" | "ctx"; text: string };
+type DiffLine = { type: "add" | "del" | "ctx"; text: string; oldNum?: number; newNum?: number };
 
 /** Simple LCS-based unified diff. */
 function computeUnifiedDiff(oldLines: string[], newLines: string[]): DiffLine[] {
@@ -423,20 +425,20 @@ function computeUnifiedDiff(oldLines: string[], newLines: string[]): DiffLine[] 
     }
   }
 
-  // Backtrack to produce diff
+  // Backtrack to produce diff (in reverse)
   const result: DiffLine[] = [];
   let i = m;
   let j = n;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-      result.push({ type: "ctx", text: oldLines[i - 1] });
+      result.push({ type: "ctx", text: oldLines[i - 1], oldNum: i, newNum: j });
       i--;
       j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.push({ type: "add", text: newLines[j - 1] });
+      result.push({ type: "add", text: newLines[j - 1], newNum: j });
       j--;
     } else {
-      result.push({ type: "del", text: oldLines[i - 1] });
+      result.push({ type: "del", text: oldLines[i - 1], oldNum: i });
       i--;
     }
   }
