@@ -249,6 +249,24 @@
   max-width: 500px;
 }
 
+.tool-edit-stats {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-weight: 600;
+}
+
+.tool-edit-stats--add {
+  color: #1a7f37;
+}
+
+.tool-edit-stats--del {
+  color: #cf222e;
+}
+
 .tool-chevron {
   color: #999;
   font-size: 11px;
@@ -309,6 +327,93 @@
   transition:
     background 0.15s ease,
     border-color 0.15s ease;
+}
+
+/* ── Edit diff view ── */
+.edit-diff {
+  margin-top: 4px;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.edit-diff--clickable {
+  cursor: pointer;
+}
+
+.edit-diff--clickable:hover {
+  border-color: #ddd;
+}
+
+.edit-diff-body {
+  overflow-x: auto;
+}
+
+.edit-diff-line {
+  display: flex;
+  white-space: pre;
+  min-height: 20px;
+}
+
+.edit-diff-line--add {
+  background: #dafbe1;
+}
+
+.edit-diff-line--del {
+  background: #ffebe9;
+}
+
+.edit-diff-line--ctx {
+  background: #fff;
+}
+
+.edit-diff-line-num {
+  flex-shrink: 0;
+  width: 32px;
+  text-align: right;
+  padding-right: 4px;
+  color: #a0a0a0;
+  user-select: none;
+  border-right: 1px solid #eaeaea;
+}
+
+.edit-diff-line-prefix {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  color: #656d76;
+  user-select: none;
+}
+
+.edit-diff-line--add .edit-diff-line-prefix {
+  color: #1a7f37;
+}
+
+.edit-diff-line--del .edit-diff-line-prefix {
+  color: #cf222e;
+}
+
+.edit-diff-line-content {
+  flex: 1;
+  padding-right: 12px;
+}
+
+.edit-diff--collapsed {
+  position: relative;
+}
+
+.edit-diff--collapsed .edit-diff-body {
+  max-height: 150px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
 }
 
 /* ── Subagent block ── */

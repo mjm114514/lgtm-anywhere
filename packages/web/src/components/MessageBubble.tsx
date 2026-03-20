@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -177,6 +177,20 @@ function ToolBlock({
   const inputSummary = formatToolInput(item.name, item.input, cwd);
   const inProgress = isInProgress && !item.result;
 
+  // Compute +/- line stats for Edit tool
+  const editStats = useMemo(() => {
+    if (item.name !== "Edit") return null;
+    const obj = (item.input && typeof item.input === "object" ? item.input : {}) as Record<string, unknown>;
+    const oldStr = typeof obj.old_string === "string" ? obj.old_string : "";
+    const newStr = typeof obj.new_string === "string" ? obj.new_string : "";
+    const oldLines = oldStr.split("\n");
+    const newLines = newStr.split("\n");
+    const diff = computeUnifiedDiff(oldLines, newLines);
+    const adds = diff.filter((l) => l.type === "add").length;
+    const dels = diff.filter((l) => l.type === "del").length;
+    return { adds, dels };
+  }, [item.name, item.input]);
+
   return (
     <div className="timeline-item">
       <div
@@ -187,6 +201,12 @@ function ToolBlock({
           <span className="tool-name">{item.name}</span>
           {inputSummary && (
             <span className="tool-input-summary">{inputSummary}</span>
+          )}
+          {editStats && (
+            <span className="tool-edit-stats">
+              {editStats.adds > 0 && <span className="tool-edit-stats--add">+{editStats.adds}</span>}
+              {editStats.dels > 0 && <span className="tool-edit-stats--del">-{editStats.dels}</span>}
+            </span>
           )}
           <span
             className={`tool-chevron ${expanded ? "tool-chevron--open" : ""}`}
@@ -203,7 +223,11 @@ function ToolBlock({
             )}
           </div>
         )}
-        {item.result && <ToolResult content={item.result} />}
+        {item.name === "Edit" ? (
+          <EditDiffResult input={item.input} result={item.result} cwd={cwd} />
+        ) : (
+          item.result && <ToolResult content={item.result} />
+        )}
       </div>
     </div>
   );
@@ -342,6 +366,135 @@ function ToolResult({ content }: { content: string }) {
       </pre>
     </div>
   );
+}
+
+/** Max visible diff lines before collapsing (show 8 lines, last one fades). */
+const DIFF_MAX_LINES = 8;
+
+/**
+ * Parse the starting line number from a `cat -n` style Edit tool result.
+ * The result typically looks like:
+ *   "The file ... has been updated successfully.\n\n     45\tcode here\n     46\t..."
+ * We find the first numbered line and match it against old_string's first line
+ * to compute the offset.
+ */
+function parseStartLine(result: string | undefined, oldFirstLine: string): number {
+  if (!result) return 1;
+  // Match lines like "     45\tsome code" (cat -n format)
+  const linePattern = /^ {0,10}(\d+)\t(.*)$/gm;
+  let match;
+  while ((match = linePattern.exec(result)) !== null) {
+    const lineNum = parseInt(match[1], 10);
+    const lineText = match[2];
+    // Find the line that matches the first line of old_string
+    if (lineText === oldFirstLine || lineText.trimEnd() === oldFirstLine.trimEnd()) {
+      return lineNum;
+    }
+  }
+  return 1;
+}
+
+/** Render a unified diff view for Edit tool results. */
+function EditDiffResult({
+  input,
+  result,
+}: {
+  input: unknown;
+  result?: string;
+  cwd?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const obj = (input && typeof input === "object" ? input : {}) as Record<
+    string,
+    unknown
+  >;
+  const oldStr = (typeof obj.old_string === "string" ? obj.old_string : "") as string;
+  const newStr = (typeof obj.new_string === "string" ? obj.new_string : "") as string;
+
+  // Build unified diff lines
+  const oldLines = oldStr.split("\n");
+  const newLines = newStr.split("\n");
+  const rawDiff = computeUnifiedDiff(oldLines, newLines);
+
+  // Determine the starting line offset from the tool result
+  const startLine = parseStartLine(result, oldLines[0]);
+  const offset = startLine - 1;
+  const diffLines = rawDiff.map((line) => ({
+    ...line,
+    oldNum: line.oldNum != null ? line.oldNum + offset : undefined,
+    newNum: line.newNum != null ? line.newNum + offset : undefined,
+  }));
+
+  const truncated = diffLines.length > DIFF_MAX_LINES;
+  const visibleLines = expanded ? diffLines : diffLines.slice(0, DIFF_MAX_LINES);
+
+  return (
+    <div
+      className={`edit-diff ${truncated ? "edit-diff--clickable" : ""} ${truncated && !expanded ? "edit-diff--collapsed" : ""}`}
+      onClick={() => truncated && setExpanded(!expanded)}
+    >
+      <div className="edit-diff-body">
+        {visibleLines.map((line, i) => (
+          <div
+            key={i}
+            className={`edit-diff-line ${
+              line.type === "add"
+                ? "edit-diff-line--add"
+                : line.type === "del"
+                  ? "edit-diff-line--del"
+                  : "edit-diff-line--ctx"
+            }`}
+          >
+            <span className="edit-diff-line-num">{line.oldNum ?? ""}</span>
+            <span className="edit-diff-line-num">{line.newNum ?? ""}</span>
+            <span className="edit-diff-line-prefix">
+              {line.type === "add" ? "+" : line.type === "del" ? "-" : " "}
+            </span>
+            <span className="edit-diff-line-content">{line.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type DiffLine = { type: "add" | "del" | "ctx"; text: string; oldNum?: number; newNum?: number };
+
+/** Simple LCS-based unified diff. */
+function computeUnifiedDiff(oldLines: string[], newLines: string[]): DiffLine[] {
+  // Build LCS table
+  const m = oldLines.length;
+  const n = newLines.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array(n + 1).fill(0),
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        oldLines[i - 1] === newLines[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  // Backtrack to produce diff (in reverse)
+  const result: DiffLine[] = [];
+  let i = m;
+  let j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      result.push({ type: "ctx", text: oldLines[i - 1], oldNum: i, newNum: j });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.push({ type: "add", text: newLines[j - 1], newNum: j });
+      j--;
+    } else {
+      result.push({ type: "del", text: oldLines[i - 1], oldNum: i });
+      i--;
+    }
+  }
+  return result.reverse();
 }
 
 /** Strip cwd prefix from a file path for shorter display. */
