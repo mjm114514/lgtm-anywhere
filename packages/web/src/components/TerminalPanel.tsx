@@ -29,15 +29,24 @@ function TerminalTabBody({
   terminalId,
   isActive,
   wsPathPrefix,
+  onExit,
 }: {
   terminalId: string;
   isActive: boolean;
   wsPathPrefix?: string;
+  onExit?: (terminalId: string) => void;
 }) {
   const { containerRef, isConnected, exitCode, fit, focus } = useTerminal(
     terminalId,
     wsPathPrefix,
   );
+
+  // Auto-close the tab when the process exits
+  useEffect(() => {
+    if (exitCode !== null && onExit) {
+      onExit(terminalId);
+    }
+  }, [exitCode, onExit, terminalId]);
 
   // Re-fit whenever the container is resized (drag handle, window resize, tab switch)
   useEffect(() => {
@@ -66,11 +75,6 @@ function TerminalTabBody({
       className={`terminal-tab-body ${isActive ? "terminal-tab-body--active" : ""}`}
     >
       <div ref={containerRef} className="terminal-xterm-container" />
-      {exitCode !== null && (
-        <div className="terminal-exit-badge">
-          Process exited with code {exitCode}
-        </div>
-      )}
       {!isConnected && exitCode === null && (
         <div className="terminal-connecting-badge">Connecting...</div>
       )}
@@ -321,6 +325,7 @@ export function TerminalPanel({ cwd, nodeId }: TerminalPanelProps) {
                 terminalId={tab.id}
                 isActive={tab.id === activeTabId}
                 wsPathPrefix={wsPathPrefix}
+                onExit={handleCloseTab}
               />
             ))}
             {tabs.length === 0 && (
