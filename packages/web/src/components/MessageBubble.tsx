@@ -454,7 +454,6 @@ function EditDiffResult({
           </div>
         ))}
       </div>
-      {truncated && !expanded && <div className="edit-diff-fade" />}
     </div>
   );
 }
