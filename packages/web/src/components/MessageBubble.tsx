@@ -371,9 +371,33 @@ function ToolResult({ content }: { content: string }) {
 /** Max visible diff lines before collapsing (show 8 lines, last one fades). */
 const DIFF_MAX_LINES = 8;
 
+/**
+ * Parse the starting line number from a `cat -n` style Edit tool result.
+ * The result typically looks like:
+ *   "The file ... has been updated successfully.\n\n     45\tcode here\n     46\t..."
+ * We find the first numbered line and match it against old_string's first line
+ * to compute the offset.
+ */
+function parseStartLine(result: string | undefined, oldFirstLine: string): number {
+  if (!result) return 1;
+  // Match lines like "     45\tsome code" (cat -n format)
+  const linePattern = /^ {0,10}(\d+)\t(.*)$/gm;
+  let match;
+  while ((match = linePattern.exec(result)) !== null) {
+    const lineNum = parseInt(match[1], 10);
+    const lineText = match[2];
+    // Find the line that matches the first line of old_string
+    if (lineText === oldFirstLine || lineText.trimEnd() === oldFirstLine.trimEnd()) {
+      return lineNum;
+    }
+  }
+  return 1;
+}
+
 /** Render a unified diff view for Edit tool results. */
 function EditDiffResult({
   input,
+  result,
 }: {
   input: unknown;
   result?: string;
@@ -390,7 +414,16 @@ function EditDiffResult({
   // Build unified diff lines
   const oldLines = oldStr.split("\n");
   const newLines = newStr.split("\n");
-  const diffLines = computeUnifiedDiff(oldLines, newLines);
+  const rawDiff = computeUnifiedDiff(oldLines, newLines);
+
+  // Determine the starting line offset from the tool result
+  const startLine = parseStartLine(result, oldLines[0]);
+  const offset = startLine - 1;
+  const diffLines = rawDiff.map((line) => ({
+    ...line,
+    oldNum: line.oldNum != null ? line.oldNum + offset : undefined,
+    newNum: line.newNum != null ? line.newNum + offset : undefined,
+  }));
 
   const truncated = diffLines.length > DIFF_MAX_LINES;
   const visibleLines = expanded ? diffLines : diffLines.slice(0, DIFF_MAX_LINES);
